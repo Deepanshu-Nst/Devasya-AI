@@ -167,7 +167,7 @@ export const memoryApi = {
 
   get: (id: number) => apiClient.get(`/api/memory/${id}`),
 
-  update: (id: number, content: string, title?: string, metadata?: any) => 
+  update: (id: number, content: string, title?: string, metadata?: any) =>
     apiClient.put(`/api/memory/${id}`, { content, title, metadata }),
 
   delete: (id: number) => apiClient.delete(`/api/memory/${id}`),

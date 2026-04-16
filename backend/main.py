@@ -2,9 +2,11 @@
 Devasya AI FastAPI application.
 """
 import logging
+import traceback
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from backend.config.settings import settings
 from backend.db.postgres import init_db, close_db
@@ -71,7 +73,10 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=[
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://devasya-ai.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,6 +86,17 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(memory.router)
 app.include_router(query.router)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all exception handler that logs traceback and returns CORS-safe response."""
+    logger.error(f"Unhandled exception on {request.method} {request.url}:")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {str(exc)}"},
+    )
 
 
 @app.get("/health")
