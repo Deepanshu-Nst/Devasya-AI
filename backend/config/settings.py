@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # Redis (optional)
     REDIS_URL: Optional[str] = None
     
+    # MCP Tool Keys (optional — tools degrade gracefully without these)
+    GITHUB_TOKEN: Optional[str] = None  # For higher GitHub API rate limits
+    SERPAPI_KEY: Optional[str] = None   # For richer web search (DuckDuckGo is used if not set)
+    
     # CORS
     CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:8000"]
     

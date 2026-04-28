@@ -11,7 +11,7 @@ from pydantic import EmailStr
 
 from backend.config.settings import settings
 from backend.db.postgres import get_db
-from backend.models.schema import User, UserCreate, UserResponse
+from backend.models.schema import User, UserCreate, UserResponse, UserProfileUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -184,4 +184,19 @@ def login(email: str = Form(...), password: str = Form(...), db: Session = Depen
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     """Get current user profile."""
+    return current_user
+
+
+@router.put("/profile", response_model=UserResponse)
+def update_profile(
+    profile_data: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update current user's structured profile."""
+    current_user.profile = profile_data.profile
+    db.commit()
+    db.refresh(current_user)
+    
+    logger.info(f"Profile updated for user: {current_user.email}")
     return current_user

@@ -18,6 +18,7 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=True)
+    profile = Column(JSON, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -79,11 +80,17 @@ class UserResponse(BaseModel):
     id: int
     email: str
     full_name: Optional[str]
+    profile: Optional[dict] = None
     is_active: bool
     created_at: datetime
     
     class Config:
         from_attributes = True
+
+
+class UserProfileUpdate(BaseModel):
+    """Schema for updating user profile."""
+    profile: dict
 
 
 class MemoryCreate(BaseModel):
@@ -133,3 +140,4 @@ class QueryResponse(BaseModel):
     context: Optional[list] = None
     agent_logs: Optional[dict] = None
     session_id: str
+    tool_events: Optional[list] = None  # MCP tool activity events for frontend UI

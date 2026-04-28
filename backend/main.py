@@ -16,6 +16,7 @@ from backend.services.llm import init_llm_service
 from backend.services.retrieval import init_retrieval_service
 from backend.services.agents import get_orchestrator
 from backend.api import auth, memory, query
+from backend.mcp.router import router as mcp_router
 
 # Configure logging
 logging.basicConfig(
@@ -49,6 +50,12 @@ async def lifespan(app: FastAPI):
         
         get_orchestrator()
         logger.info("✓ Multi-agent orchestrator initialized")
+        
+        # Initialize MCP tool registry (registers all tools at startup)
+        from backend.mcp.registry import _auto_register_all_tools
+        _auto_register_all_tools()
+        from backend.mcp.registry import list_tools
+        logger.info(f"✓ MCP tool registry initialized: {list(list_tools().keys())}")
         
         logger.info("✓✓✓ All services initialized successfully ✓✓✓")
     except Exception as e:
@@ -86,6 +93,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(memory.router)
 app.include_router(query.router)
+app.include_router(mcp_router)
 
 
 @app.exception_handler(Exception)

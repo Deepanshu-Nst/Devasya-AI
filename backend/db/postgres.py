@@ -30,6 +30,12 @@ def init_db():
     """Initialize database tables."""
     try:
         Base.metadata.create_all(bind=engine)
+        
+        # Ensure existing tables have new columns without needing alembic
+        with engine.begin() as conn:
+            from sqlalchemy import text
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile JSON;"))
+            
         logger.info("Database tables created successfully")
     except Exception as e:
         logger.error(f"Error initializing database: {e}")

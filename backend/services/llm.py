@@ -41,7 +41,8 @@ class LLMService:
         messages_list: Optional[list] = None
     ) -> str:
         """
-        Generate response from LLM.
+        Generate response from LLM (synchronous, blocking).
+        Use async_generate() when calling from an async context.
         """
         try:
             from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
@@ -66,6 +67,29 @@ class LLMService:
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             raise
+
+    async def async_generate(
+        self,
+        prompt: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        max_tokens: int = 1000,
+        messages_list: Optional[list] = None
+    ) -> str:
+        """
+        Generate response from LLM asynchronously.
+        Runs the blocking LLM call in a thread pool to avoid blocking the event loop.
+        """
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            lambda: self.generate(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                max_tokens=max_tokens,
+                messages_list=messages_list,
+            )
+        )
     
     def generate_structured(
         self,

@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/query", tags=["query"])
 
 
 @router.post("/ask", response_model=QueryResponse)
-def ask_query(
+async def ask_query(
     query_request: QueryRequest,
     authorization: str = Header(None),
     db: Session = Depends(get_db)
@@ -26,9 +26,9 @@ def ask_query(
     
     This endpoint:
     1. Validates user authentication
-    2. Executes multi-agent pipeline (planner, retriever, reasoner, validator)
+    2. Executes multi-agent pipeline (planner, retriever, reasoner, validator, MCP tools)
     3. Stores interaction for training and analysis
-    4. Returns structured insights, connections, and actions
+    4. Returns structured insights, connections, actions, and tool_events
     """
     # Validate token
     if not authorization or not authorization.startswith("Bearer "):
@@ -49,7 +49,6 @@ def ask_query(
         )
     
     try:
-        # Execute multi-agent orchestration
         logger.info(f"Processing query for user {user_id}: {query_request.query}")
         
         import uuid
@@ -68,14 +67,16 @@ def ask_query(
             if answer:
                 chat_history.append({"role": "assistant", "content": answer})
         
+        # Call async pipeline directly (no event loop conflict)
         orchestrator = get_orchestrator()
-        result = orchestrator.execute(
+        result = await orchestrator._async_execute(
             user_id=user_id,
             user_query=query_request.query,
+            user_profile=user.profile,
             chat_history=chat_history
         )
         
-        # Store interaction in database for training and analysis
+        # Store interaction
         interaction = Interaction(
             user_id=user_id,
             session_id=session_id,
@@ -93,18 +94,18 @@ def ask_query(
         
         logger.info(f"Interaction {interaction.id} stored for user {user_id}")
         
-        # Return response
         return QueryResponse(
             insights=result.get("insights", ""),
             connections=result.get("connections", ""),
             actions=result.get("actions", ""),
             context=result.get("context", []),
             agent_logs=result.get("agent_logs", {}),
-            session_id=session_id
+            session_id=session_id,
+            tool_events=result.get("tool_events", []),
         )
     
     except Exception as e:
-        logger.error(f"Error processing query: {e}")
+        logger.error(f"Error processing query: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing query: {str(e)}"
