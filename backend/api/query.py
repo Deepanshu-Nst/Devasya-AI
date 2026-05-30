@@ -112,10 +112,13 @@ async def ask_query(
         )
     
     except Exception as e:
-        logger.error(f"Error processing query: {e}", exc_info=True)
+        import traceback
+        tb = traceback.format_exc()
+        print(f"Error processing query: {e}\n{tb}")
+        logger.error(f"Error processing query: {e}\n{tb}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing query: {str(e)}"
+            detail=f"Error processing query: {str(e)}\n\nTraceback:\n{tb}"
         )
 
 

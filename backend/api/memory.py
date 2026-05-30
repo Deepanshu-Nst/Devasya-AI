@@ -77,10 +77,13 @@ def add_memory(
     
     except Exception as e:
         db.rollback()
-        logger.error(f"Error adding memory: {e}")
+        import traceback
+        tb = traceback.format_exc()
+        print(f"Error adding memory: {e}\n{tb}")
+        logger.error(f"Error adding memory: {e}\n{tb}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error adding memory: {str(e)}"
+            detail=f"Error adding memory: {str(e)}\n\nTraceback:\n{tb}"
         )
 
 
@@ -318,8 +321,11 @@ async def upload_document(
     
     except Exception as e:
         db.rollback()
-        logger.error(f"Error processing document upload: {e}")
+        import traceback
+        tb = traceback.format_exc()
+        print(f"Error processing document upload: {e}\n{tb}")
+        logger.error(f"Error processing document upload: {e}\n{tb}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing document: {str(e)}"
+            detail=f"Error processing document: {str(e)}\n\nTraceback:\n{tb}"
         )
