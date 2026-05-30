@@ -2,11 +2,14 @@
 MCP API Router — exposes tool registry info and direct tool execution endpoints.
 """
 import logging
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, status, Depends
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 
-from backend.api.auth import decode_token
+from backend.api.auth import get_current_user
+from backend.db.postgres import get_db
+from backend.models.schema import Profile
+from sqlalchemy.orm import Session
 from backend.mcp.registry import list_tools, get_tool
 from backend.mcp.schemas import ToolCall
 
@@ -44,21 +47,13 @@ class DirectToolRequest(BaseModel):
 @router.post("/execute")
 async def execute_tool_directly(
     request: DirectToolRequest,
-    authorization: str = Header(None),
+    current_user: Profile = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Directly execute a single MCP tool by name.
     Useful for frontend calling specific tools without a full chat query.
     """
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header",
-        )
-
-    token = authorization.split("Bearer ")[1]
-    user_id = decode_token(token)  # Validates token
-
     entry = get_tool(request.tool_name)
     if not entry:
         raise HTTPException(
@@ -68,16 +63,11 @@ async def execute_tool_directly(
 
     from backend.mcp.executor import _execute_single_tool
     from backend.mcp.context import build_user_context
-    from backend.db.postgres import get_db
-    from backend.models.schema import Profile
-    import uuid
 
     # Fetch profile and workspace to populate memory for the tool
     memory_summary = ""
     try:
-        db = next(get_db())
-        user_uuid = uuid.UUID(user_id)
-        profile = db.query(Profile).filter(Profile.id == user_uuid).first()
+        profile = current_user
         
         if profile and profile.workspaces:
             workspace_id = profile.workspaces[0].id
