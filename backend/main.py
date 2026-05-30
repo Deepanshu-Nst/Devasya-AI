@@ -35,9 +35,11 @@ async def lifespan(app: FastAPI):
         init_db()
         logger.info("✓ Database initialized")
         
-        init_vector_store()
-        logger.info("✓ Vector store initialized")
-        
+        try:
+            init_vector_store()
+            logger.info("✓ Vector store initialized")
+        except Exception as e:
+            logger.warning(f"Vector store disabled: {e}")
 
         init_llm_service()
         logger.info("✓ LLM service initialized")
