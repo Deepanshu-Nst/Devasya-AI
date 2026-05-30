@@ -44,8 +44,11 @@ async def lifespan(app: FastAPI):
         init_llm_service()
         logger.info("✓ LLM service initialized")
         
-        init_retrieval_service()
-        logger.info("✓ Retrieval service initialized")
+        try:
+            init_retrieval_service()
+            logger.info("✓ Retrieval service initialized")
+        except Exception as e:
+            logger.warning(f"Retrieval service disabled: {e}")
         
         get_orchestrator()
         logger.info("✓ Multi-agent orchestrator initialized")
