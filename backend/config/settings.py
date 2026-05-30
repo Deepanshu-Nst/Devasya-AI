@@ -24,11 +24,12 @@ class Settings(BaseSettings):
     
     
     # LLM
-    LLM_PROVIDER: str = "openai"  # "openai" or "groq"
-    OPENAI_API_KEY: Optional[str] = None
-    OPENAI_MODEL: str = "gpt-4-turbo-preview"
+    LLM_PROVIDER: str = "groq"
     GROQ_API_KEY: Optional[str] = None
     GROQ_MODEL: str = "mixtral-8x7b-32768"
+    
+    # Embeddings
+    HUGGINGFACE_API_KEY: Optional[str] = None
     
     # Redis (optional)
     REDIS_URL: Optional[str] = None

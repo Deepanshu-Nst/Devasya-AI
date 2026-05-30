@@ -14,23 +14,40 @@ from backend.models.schema import DocumentChunk, Document, MemoryPage
 logger = logging.getLogger(__name__)
 
 class VectorStore:
-    """Wrapper for pgvector operations using OpenAI embeddings."""
+    """Wrapper for pgvector operations using HuggingFace embeddings."""
     
     def __init__(self):
         try:
-            self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
-            logger.info("OpenAI and pgvector initialized successfully")
+            self.provider = "huggingface"
+            logger.info("Using HuggingFace Inference API for embeddings")
         except Exception as e:
             logger.error(f"Error initializing VectorStore: {e}")
             raise
     
     def _get_embedding(self, text: str) -> List[float]:
-        """Generate embedding for text using OpenAI."""
-        response = self.client.embeddings.create(
-            input=text,
-            model="text-embedding-3-small"
-        )
-        return response.data[0].embedding
+        """Generate embedding for text using fallback HuggingFace API."""
+        import requests
+        import time
+        API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+        
+        headers = {}
+        if settings.HUGGINGFACE_API_KEY:
+            headers["Authorization"] = f"Bearer {settings.HUGGINGFACE_API_KEY}"
+        
+        for _ in range(3):
+            response = requests.post(API_URL, headers=headers, json={"inputs": [text]})
+            if response.status_code == 200:
+                result = response.json()
+                embedding = result[0] if isinstance(result[0], list) else result
+                # Pad to 1536 dimensions to match pgvector schema without requiring DB migration
+                if len(embedding) < 1536:
+                    embedding = embedding + [0.0] * (1536 - len(embedding))
+                elif len(embedding) > 1536:
+                    embedding = embedding[:1536]
+                return embedding
+            time.sleep(2)
+            
+        raise Exception(f"HuggingFace API failed with status {response.status_code}: {response.text}")
         
     def add_chunks(self, chunks: List[str], document_id: Optional[uuid.UUID] = None, memory_id: Optional[uuid.UUID] = None) -> List[uuid.UUID]:
         """Embed and store chunks in Postgres pgvector."""

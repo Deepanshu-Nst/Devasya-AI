@@ -55,10 +55,17 @@ def get_current_user(
         profile = db.query(Profile).filter(Profile.id == user_uuid).first()
         
         if not profile:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User profile not found. Database trigger may have failed."
+            # Auto-provision the profile if the database trigger failed or didn't run
+            user_metadata = response.user.user_metadata or {}
+            profile = Profile(
+                id=user_uuid,
+                email=response.user.email,
+                full_name=user_metadata.get("full_name") or user_metadata.get("name"),
+                avatar_url=user_metadata.get("avatar_url") or user_metadata.get("picture")
             )
+            db.add(profile)
+            db.commit()
+            db.refresh(profile)
             
         return profile
 

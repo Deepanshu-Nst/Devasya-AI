@@ -13,25 +13,17 @@ class LLMService:
     """Service for interacting with LLM providers."""
     
     def __init__(self):
-        """Initialize LLM service."""
-        if settings.LLM_PROVIDER == "openai":
-            from langchain_openai import ChatOpenAI
-            self.llm = ChatOpenAI(
-                api_key=settings.OPENAI_API_KEY,
-                model=settings.OPENAI_MODEL,
-                temperature=0.7,
-            )
-            logger.info(f"OpenAI LLM initialized: {settings.OPENAI_MODEL}")
-        elif settings.LLM_PROVIDER == "groq":
-            from langchain_groq import ChatGroq
-            self.llm = ChatGroq(
-                api_key=settings.GROQ_API_KEY,
-                model=settings.GROQ_MODEL,
-                temperature=0.7,
-            )
-            logger.info(f"Groq LLM initialized: {settings.GROQ_MODEL}")
-        else:
-            raise ValueError(f"Unsupported LLM provider: {settings.LLM_PROVIDER}")
+        """Initialize LLM service (Forced Groq)."""
+        if not settings.GROQ_API_KEY:
+            logger.warning("GROQ_API_KEY is missing! LLM calls will fail.")
+            
+        from langchain_groq import ChatGroq
+        self.llm = ChatGroq(
+            api_key=settings.GROQ_API_KEY,
+            model=settings.GROQ_MODEL,
+            temperature=0.7,
+        )
+        logger.info(f"Groq LLM initialized: {settings.GROQ_MODEL}")
     
     def generate(
         self,
