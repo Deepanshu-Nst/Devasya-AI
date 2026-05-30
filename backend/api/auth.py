@@ -5,10 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 import jwt
 import logging
+import uuid
 
 from backend.config.settings import settings
 from backend.db.postgres import get_db
-from backend.models.schema import User, UserResponse, UserProfileUpdate
+from backend.models.schema import Profile, UserResponse
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +18,10 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 def get_current_user(
     authorization: str = Header(None),
     db: Session = Depends(get_db)
-) -> User:
+) -> Profile:
     """
     Get current authenticated user from Supabase JWT token.
-    Auto-provisions local User record if it doesn't exist.
+    Supabase DB triggers automatically provision the Profile row.
     """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
@@ -39,39 +40,31 @@ def get_current_user(
             options={"verify_aud": False} # Supabase aud can vary
         )
         
-        email: str = payload.get("email")
-        if not email:
+        user_id_str: str = payload.get("sub")
+        if not user_id_str:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token: no email found"
+                detail="Invalid token: no sub (UUID) found"
             )
             
-        # Find user locally
-        user = db.query(User).filter(User.email == email).first()
-        
-        if not user:
-            # Auto-provision local user from Supabase token metadata
-            user_metadata = payload.get("user_metadata", {})
-            name = user_metadata.get("full_name") or user_metadata.get("name")
-            picture = user_metadata.get("avatar_url") or user_metadata.get("picture")
-            
-            user = User(
-                email=email,
-                full_name=name,
-                profile={"picture": picture} if picture else None
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            logger.info(f"Auto-provisioned local user from Supabase: {email}")
-            
-        if not user.is_active:
+        try:
+            user_uuid = uuid.UUID(user_id_str)
+        except ValueError:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="User account is inactive"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token sub format"
+            )
+
+        # Find user profile locally (should be auto-provisioned by DB trigger)
+        profile = db.query(Profile).filter(Profile.id == user_uuid).first()
+        
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User profile not found. Database trigger may have failed."
             )
             
-        return user
+        return profile
         
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -87,21 +80,6 @@ def get_current_user(
 
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: Profile = Depends(get_current_user)):
     """Get current user profile."""
-    return current_user
-
-
-@router.put("/profile", response_model=UserResponse)
-def update_profile(
-    profile_data: UserProfileUpdate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Update current user's structured profile."""
-    current_user.profile = profile_data.profile
-    db.commit()
-    db.refresh(current_user)
-    
-    logger.info(f"Profile updated for user: {current_user.email}")
     return current_user

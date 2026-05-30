@@ -11,7 +11,6 @@ from fastapi.responses import JSONResponse
 from backend.config.settings import settings
 from backend.db.postgres import init_db, close_db
 from backend.db.vector_store import init_vector_store
-from backend.services.embedding import init_embedding_service
 from backend.services.llm import init_llm_service
 from backend.services.retrieval import init_retrieval_service
 from backend.services.agents import get_orchestrator
@@ -39,9 +38,7 @@ async def lifespan(app: FastAPI):
         init_vector_store()
         logger.info("✓ Vector store initialized")
         
-        init_embedding_service()
-        logger.info("✓ Embedding service initialized")
-        
+
         init_llm_service()
         logger.info("✓ LLM service initialized")
         

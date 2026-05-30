@@ -1,141 +1,177 @@
 """
-SQLAlchemy models for Devasya AI database.
+SQLAlchemy models for Devasya AI database matching Supabase architecture.
 """
 from datetime import datetime
 import uuid
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON, BigInteger
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 
 Base = declarative_base()
 
-
-class User(Base):
-    """User model for multi-tenant system."""
-    __tablename__ = "users"
+class Profile(Base):
+    """User profile model mapping to auth.users in Supabase."""
+    __tablename__ = "profiles"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     full_name = Column(String(255), nullable=True)
-    profile = Column(JSON, nullable=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    avatar_url = Column(String(1024), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    memories = relationship("Memory", back_populates="user", cascade="all, delete-orphan")
-    interactions = relationship("Interaction", back_populates="user", cascade="all, delete-orphan")
+    workspaces = relationship("Workspace", back_populates="owner", cascade="all, delete-orphan")
+    memory_pages = relationship("MemoryPage", back_populates="creator")
+    documents = relationship("Document", back_populates="uploader")
+    chat_sessions = relationship("ChatSession", back_populates="creator")
 
 
-class Memory(Base):
-    """Memory model for storing user knowledge."""
-    __tablename__ = "memories"
+class Workspace(Base):
+    """Workspace for organizing data."""
+    __tablename__ = "workspaces"
     
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    content = Column(Text, nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    owner = relationship("Profile", back_populates="workspaces")
+    memory_pages = relationship("MemoryPage", back_populates="workspace", cascade="all, delete-orphan")
+    documents = relationship("Document", back_populates="workspace", cascade="all, delete-orphan")
+    chat_sessions = relationship("ChatSession", back_populates="workspace", cascade="all, delete-orphan")
+
+
+class MemoryPage(Base):
+    """A page of text memory explicitly created by the user."""
+    __tablename__ = "memory_pages"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(255), nullable=True)
-    embedding_id = Column(String(255), nullable=True)  # Reference to ChromaDB document ID
-    meta_data = Column(JSON, nullable=True)  # Store additional metadata
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    content = Column(Text, nullable=False)
+    visibility = Column(String(50), default="private")
+    created_by = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    user = relationship("User", back_populates="memories")
+    workspace = relationship("Workspace", back_populates="memory_pages")
+    creator = relationship("Profile", back_populates="memory_pages")
+    chunks = relationship("DocumentChunk", back_populates="memory", cascade="all, delete-orphan")
 
 
-class Interaction(Base):
-    """Model for storing user interactions and query results."""
-    __tablename__ = "interactions"
+class Document(Base):
+    """Uploaded files/documents."""
+    __tablename__ = "documents"
     
-    id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String(36), index=True, nullable=False, default=lambda: str(uuid.uuid4()))
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    query = Column(Text, nullable=False)
-    response = Column(JSON, nullable=False)  # Structured output
-    context_used = Column(JSON, nullable=True)  # Retrieved context
-    agent_logs = Column(JSON, nullable=True)  # Multi-agent execution logs
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    uploaded_by = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="SET NULL"), nullable=True)
+    file_name = Column(String(1024), nullable=False)
+    file_url = Column(String(2048), nullable=False)
+    file_type = Column(String(100), nullable=True)
+    file_size = Column(BigInteger, nullable=True)
+    embedding_status = Column(String(50), default="pending")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
-    user = relationship("User", back_populates="interactions")
+    workspace = relationship("Workspace", back_populates="documents")
+    uploader = relationship("Profile", back_populates="documents")
+    chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+
+
+class DocumentChunk(Base):
+    """Vector embeddings for memory pages and documents."""
+    __tablename__ = "document_chunks"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=True, index=True)
+    memory_id = Column(UUID(as_uuid=True), ForeignKey("memory_pages.id", ondelete="CASCADE"), nullable=True, index=True)
+    content = Column(Text, nullable=False)
+    chunk_index = Column(Integer, nullable=True)
+    embedding = Column(Vector(1536)) # OpenAI embedding dimension
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    document = relationship("Document", back_populates="chunks")
+    memory = relationship("MemoryPage", back_populates="chunks")
+
+
+class ChatSession(Base):
+    """A chat thread."""
+    __tablename__ = "chat_sessions"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(255), nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    workspace = relationship("Workspace", back_populates="chat_sessions")
+    creator = relationship("Profile", back_populates="chat_sessions")
+    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan", order_by="ChatMessage.created_at")
+
+
+class ChatMessage(Base):
+    """An individual message in a chat."""
+    __tablename__ = "chat_messages"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID(as_uuid=True), ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(50), nullable=False) # 'user', 'assistant', 'system'
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    session = relationship("ChatSession", back_populates="messages")
 
 
 # Pydantic schemas for API validation
-from pydantic import BaseModel, EmailStr
-from typing import Optional, Any
-
-
-class UserCreate(BaseModel):
-    """Schema for user registration."""
-    email: EmailStr
-    full_name: Optional[str] = None
-
+from pydantic import BaseModel, EmailStr, HttpUrl
+from typing import Optional, Any, List
 
 class UserResponse(BaseModel):
-    """Schema for user response."""
-    id: int
+    """Schema for profile response."""
+    id: uuid.UUID
     email: str
     full_name: Optional[str]
-    profile: Optional[dict] = None
-    is_active: bool
-    created_at: datetime
+    avatar_url: Optional[str]
     
     class Config:
         from_attributes = True
-
-
-class UserProfileUpdate(BaseModel):
-    """Schema for updating user profile."""
-    profile: dict
-
 
 class MemoryCreate(BaseModel):
     """Schema for creating a memory."""
     content: str
     title: Optional[str] = None
-    metadata: Optional[dict] = None
-
+    visibility: Optional[str] = "private"
 
 class MemoryResponse(BaseModel):
     """Schema for memory response."""
-    id: int
-    content: str
+    id: uuid.UUID
+    workspace_id: uuid.UUID
     title: Optional[str]
-    meta_data: Optional[dict] = None
+    content: str
+    visibility: str
     created_at: datetime
     
     class Config:
         from_attributes = True
-
-
-class InteractionResponse(BaseModel):
-    """Schema for interaction response."""
-    id: int
-    query: str
-    response: dict
-    context_used: Optional[dict]
-    agent_logs: Optional[dict]
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
-
 
 class QueryRequest(BaseModel):
     """Schema for query request."""
     query: str
     use_memory: bool = True
-    session_id: Optional[str] = None
-
+    session_id: Optional[uuid.UUID] = None
 
 class QueryResponse(BaseModel):
     """Schema for query response."""
-    insights: str
-    connections: str
-    actions: str
-    context: Optional[list] = None
+    response: str
+    session_id: uuid.UUID
+    context_used: Optional[list] = None
     agent_logs: Optional[dict] = None
-    session_id: str
-    tool_events: Optional[list] = None  # MCP tool activity events for frontend UI

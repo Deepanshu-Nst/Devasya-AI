@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const DEFAULT_TIMEOUT_MS = 15000; // 15 seconds
 
 interface ApiResponse<T> {
   data?: T;
@@ -20,18 +21,43 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+    } catch (e) {
+      console.warn("Failed to get Supabase session for headers", e);
     }
 
     return headers;
   }
 
+  private async fetchWithTimeout(url: string, options: RequestInit, timeout: number = DEFAULT_TIMEOUT_MS): Promise<Response> {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    } catch (error: any) {
+      clearTimeout(id);
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${timeout}ms. The server might be sleeping or under heavy load.`);
+      }
+      throw error;
+    }
+  }
+
   async request<T>(
     method: string,
     endpoint: string,
-    data?: any
+    data?: any,
+    timeoutMs: number = DEFAULT_TIMEOUT_MS
   ): Promise<ApiResponse<T>> {
     try {
       const url = `${this.baseUrl}${endpoint}`;
@@ -44,38 +70,45 @@ class ApiClient {
         options.body = JSON.stringify(data);
       }
 
-      const response = await fetch(url, options);
-      const result = await response.json();
+      const response = await this.fetchWithTimeout(url, options, timeoutMs);
+      
+      let result;
+      try {
+        result = await response.json();
+      } catch (e) {
+        result = { detail: response.statusText };
+      }
 
       return {
         data: result,
         status: response.status,
         error: response.ok ? undefined : result.detail || 'Request failed',
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         status: 0,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error.message || 'Unknown network error',
       };
     }
   }
 
-  get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    return this.request('GET', endpoint);
+  get<T>(endpoint: string, timeoutMs?: number): Promise<ApiResponse<T>> {
+    return this.request('GET', endpoint, undefined, timeoutMs);
   }
 
-  post<T>(endpoint: string, data: any, useFormData: boolean = false): Promise<ApiResponse<T>> {
+  post<T>(endpoint: string, data: any, useFormData: boolean = false, timeoutMs?: number): Promise<ApiResponse<T>> {
     if (useFormData) {
-      return this.requestFormData('POST', endpoint, data);
+      return this.requestFormData('POST', endpoint, data, false, timeoutMs);
     }
-    return this.request('POST', endpoint, data);
+    return this.request('POST', endpoint, data, timeoutMs);
   }
 
   async requestFormData<T>(
     method: string,
     endpoint: string,
     data?: any,
-    isRawFormData: boolean = false
+    isRawFormData: boolean = false,
+    timeoutMs: number = 30000 // Uploads get longer timeout
   ): Promise<ApiResponse<T>> {
     try {
       const url = `${this.baseUrl}${endpoint}`;
@@ -93,9 +126,13 @@ class ApiClient {
       }
 
       const headers: Record<string, string> = {};
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      } catch (e) {
+        console.warn("Failed to get session for FormData headers", e);
       }
 
       const options: RequestInit = {
@@ -104,18 +141,24 @@ class ApiClient {
         body: bodyData,
       };
 
-      const response = await fetch(url, options);
-      const result = await response.json();
+      const response = await this.fetchWithTimeout(url, options, timeoutMs);
+      
+      let result;
+      try {
+        result = await response.json();
+      } catch (e) {
+        result = { detail: response.statusText };
+      }
 
       return {
         data: result,
         status: response.status,
-        error: response.ok ? undefined : result.detail || 'Request failed',
+        error: response.ok ? undefined : result.detail || 'Upload failed',
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         status: 0,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error.message || 'Unknown network error during upload',
       };
     }
   }
@@ -144,31 +187,31 @@ export const memoryApi = {
   upload: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return apiClient.requestFormData<{ message: string, memories: any[] }>('POST', '/api/memory/upload', formData, true);
+    return apiClient.requestFormData<{ message: string, document_id: string }>('POST', '/api/memory/upload', formData, true);
   },
 
   list: (skip: number = 0, limit: number = 10) =>
     apiClient.get(`/api/memory/list?skip=${skip}&limit=${limit}`),
 
-  get: (id: number) => apiClient.get(`/api/memory/${id}`),
+  get: (id: string) => apiClient.get(`/api/memory/${id}`),
 
-  update: (id: number, content: string, title?: string, metadata?: any) =>
-    apiClient.put(`/api/memory/${id}`, { content, title, metadata }),
+  update: (id: string, content: string, title?: string, visibility?: string) =>
+    apiClient.put(`/api/memory/${id}`, { content, title, visibility }),
 
-  delete: (id: number) => apiClient.delete(`/api/memory/${id}`),
+  delete: (id: string) => apiClient.delete(`/api/memory/${id}`),
 };
 
 // Query endpoints
 export const queryApi = {
   ask: (query: string, useMemory: boolean = true, sessionId?: string) =>
-    apiClient.post('/api/query/ask', { query, use_memory: useMemory, session_id: sessionId }),
+    apiClient.post('/api/query/ask', { query, use_memory: useMemory, session_id: sessionId }, false, 60000), // 60s timeout for reasoning
 
   sessions: () => apiClient.get('/api/query/sessions'),
 
   deleteSession: (sessionId: string) => apiClient.delete(`/api/query/sessions/${sessionId}`),
 
-  history: (skip: number = 0, limit: number = 10, sessionId?: string) =>
+  history: (skip: number = 0, limit: number = 50, sessionId?: string) =>
     apiClient.get(`/api/query/history?skip=${skip}&limit=${limit}${sessionId ? `&session_id=${sessionId}` : ''}`),
 
-  getInteraction: (id: number) => apiClient.get(`/api/query/${id}`),
+  getInteraction: (id: string) => apiClient.get(`/api/query/${id}`),
 };

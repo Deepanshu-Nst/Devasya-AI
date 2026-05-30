@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import re
+import uuid
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
@@ -45,13 +46,13 @@ class RetrievalTool:
     def __init__(self):
         self.retrieval_service = get_retrieval_service()
 
-    def __call__(self, user_id: int, query: str, top_k: int = 5) -> List[Dict]:
-        return self.retrieval_service.retrieve_context(user_id, query, top_k)
+    def __call__(self, workspace_id: uuid.UUID, query: str, top_k: int = 5) -> List[Dict]:
+        return self.retrieval_service.retrieve_context(workspace_id, query, top_k)
 
-    async def async_retrieve(self, user_id: int, query: str, top_k: int = 5) -> List[Dict]:
+    async def async_retrieve(self, workspace_id: uuid.UUID, query: str, top_k: int = 5) -> List[Dict]:
         """Non-blocking async retrieval using thread executor."""
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self, user_id, query, top_k)
+        return await loop.run_in_executor(None, self, workspace_id, query, top_k)
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +383,8 @@ class MultiAgentOrchestrator:
 
     async def _async_execute(
         self,
-        user_id: int,
+        user_id: uuid.UUID,
+        workspace_id: uuid.UUID,
         user_query: str,
         user_profile: Optional[Dict] = None,
         chat_history: list = None,
@@ -420,7 +422,7 @@ class MultiAgentOrchestrator:
 
                 # Run all retrieval queries concurrently
                 retrieval_tasks = [
-                    self.retrieval_tool.async_retrieve(user_id, q, top_k=4)
+                    self.retrieval_tool.async_retrieve(workspace_id, q, top_k=4)
                     for q in queries[:3]
                 ]
                 results = await asyncio.gather(*retrieval_tasks, return_exceptions=True)

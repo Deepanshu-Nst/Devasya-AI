@@ -1,150 +1,111 @@
 """
-ChromaDB vector database handler for semantic search and RAG.
+Supabase pgvector handler for semantic search and RAG.
+Replaces legacy ChromaDB to stabilize Render builds.
 """
-from chromadb import PersistentClient
 import logging
-from typing import Optional, List
+from typing import List, Dict, Any, Optional
+import uuid
+from openai import OpenAI
 
 from backend.config.settings import settings
+from backend.db.postgres import get_db
+from backend.models.schema import DocumentChunk, Document, MemoryPage
 
 logger = logging.getLogger(__name__)
 
-
 class VectorStore:
-    """Wrapper for ChromaDB vector database operations."""
+    """Wrapper for pgvector operations using OpenAI embeddings."""
     
     def __init__(self):
         try:
-            # ✅ NEW Chroma client (modern API)
-            self.client = PersistentClient(path=settings.CHROMA_PATH)
-
-            self.collection_name = "devasya_memories"
-
-            # Get or create collection
-            self.collection = self.client.get_or_create_collection(
-                name=self.collection_name,
-                metadata={
-                    "hnsw:space": "cosine",
-                    "description": "Devasya AI memory embeddings"
-                }
-            )
-
-            logger.info("ChromaDB initialized successfully")
-
+            self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+            logger.info("OpenAI and pgvector initialized successfully")
         except Exception as e:
-            logger.error(f"Error initializing ChromaDB: {e}")
+            logger.error(f"Error initializing VectorStore: {e}")
             raise
     
-    def add_document(
-        self,
-        user_id: int,
-        content: str,
-        document_id: str,
-        metadata: Optional[dict] = None
-    ) -> str:
-        """
-        Add a document to the vector store.
+    def _get_embedding(self, text: str) -> List[float]:
+        """Generate embedding for text using OpenAI."""
+        response = self.client.embeddings.create(
+            input=text,
+            model="text-embedding-3-small"
+        )
+        return response.data[0].embedding
         
-        Args:
-            user_id: User ID for filtering
-            content: Document content to embed and store
-            document_id: Unique document ID
-            metadata: Additional metadata
+    def add_chunks(self, chunks: List[str], document_id: Optional[uuid.UUID] = None, memory_id: Optional[uuid.UUID] = None) -> List[uuid.UUID]:
+        """Embed and store chunks in Postgres pgvector."""
+        if not document_id and not memory_id:
+            raise ValueError("Must provide either document_id or memory_id")
             
-        Returns:
-            Document ID in the vector store
-        """
+        chunk_ids = []
         try:
-            doc_metadata = metadata or {}
-            doc_metadata["user_id"] = str(user_id)
+            # We must use a separate database session context here
+            db = next(get_db())
             
-            self.collection.add(
-                ids=[document_id],
-                documents=[content],
-                metadatas=[doc_metadata],
-            )
-            
-            logger.info(f"Document {document_id} added for user {user_id}")
-            return document_id
+            for i, text in enumerate(chunks):
+                embedding = self._get_embedding(text)
+                new_chunk = DocumentChunk(
+                    document_id=document_id,
+                    memory_id=memory_id,
+                    content=text,
+                    chunk_index=i,
+                    embedding=embedding
+                )
+                db.add(new_chunk)
+                db.commit()
+                db.refresh(new_chunk)
+                chunk_ids.append(new_chunk.id)
+                
+            db.close()
+            logger.info(f"Added {len(chunk_ids)} chunks to pgvector.")
+            return chunk_ids
         except Exception as e:
-            logger.error(f"Error adding document: {e}")
+            logger.error(f"Error adding vector chunks: {e}")
             raise
-    
-    def search(
-        self,
-        user_id: int,
-        query: str,
-        top_k: int = 5
-    ) -> List[dict]:
+
+    def search(self, workspace_id: uuid.UUID, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """
-        Search for relevant documents using semantic similarity.
-        
-        Args:
-            user_id: User ID to filter results
-            query: Query text to embed
-            top_k: Number of top results to return
-            
-        Returns:
-            List of relevant documents with metadata
+        Search for relevant chunks using pgvector cosine distance operator (<=>).
         """
         try:
-            # Query the collection
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=top_k,
-                where={"user_id": {"$eq": str(user_id)}},
-            )
+            query_embedding = self._get_embedding(query)
             
-            # Format results
-            documents = []
-            if results and results["documents"] and len(results["documents"]) > 0:
-                for i, doc in enumerate(results["documents"][0]):
-                    documents.append({
-                        "content": doc,
-                        "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
-                        "distance": results["distances"][0][i] if results["distances"] else 0,
-                        "id": results["ids"][0][i] if results["ids"] else None,
-                    })
+            db = next(get_db())
             
-            return documents
+            # Find the top_k chunks that belong to this workspace
+            # We join Document and MemoryPage to verify workspace ownership
+            
+            results = db.query(DocumentChunk).outerjoin(
+                Document, DocumentChunk.document_id == Document.id
+            ).outerjoin(
+                MemoryPage, DocumentChunk.memory_id == MemoryPage.id
+            ).filter(
+                (Document.workspace_id == workspace_id) | (MemoryPage.workspace_id == workspace_id)
+            ).order_by(
+                DocumentChunk.embedding.cosine_distance(query_embedding)
+            ).limit(top_k).all()
+            
+            formatted_results = []
+            for chunk in results:
+                formatted_results.append({
+                    "id": chunk.id,
+                    "content": chunk.content,
+                    "metadata": {
+                        "document_id": str(chunk.document_id) if chunk.document_id else None,
+                        "memory_id": str(chunk.memory_id) if chunk.memory_id else None,
+                        "chunk_index": chunk.chunk_index
+                    }
+                })
+                
+            db.close()
+            return formatted_results
         except Exception as e:
-            logger.error(f"Error searching documents: {e}")
+            logger.error(f"Error searching vectors: {e}")
             return []
-    
-    def delete_document(self, document_id: str) -> bool:
-        """
-        Delete a document from the vector store.
-        
-        Args:
-            document_id: Document ID to delete
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            self.collection.delete(ids=[document_id])
-            logger.info(f"Document {document_id} deleted")
-            return True
-        except Exception as e:
-            logger.error(f"Error deleting document: {e}")
-            return False
-    
-    def get_stats(self) -> dict:
-        """Get vector store statistics."""
-        try:
-            count = self.collection.count()
-            return {
-                "collection_name": self.collection_name,
-                "document_count": count,
-            }
-        except Exception as e:
-            logger.error(f"Error getting stats: {e}")
-            return {}
 
 
 # Global vector store instance
-_vector_store: Optional[VectorStore] = None
-
+_vector_store = None
 
 def init_vector_store() -> VectorStore:
     """Initialize and return global vector store instance."""
@@ -152,7 +113,6 @@ def init_vector_store() -> VectorStore:
     if _vector_store is None:
         _vector_store = VectorStore()
     return _vector_store
-
 
 def get_vector_store() -> VectorStore:
     """Get global vector store instance."""

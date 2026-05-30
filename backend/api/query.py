@@ -1,12 +1,13 @@
 """
 Query endpoints for intelligent reasoning and insights.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import logging
+import uuid
 
 from backend.db.postgres import get_db
-from backend.models.schema import QueryRequest, QueryResponse, User, Interaction
+from backend.models.schema import QueryRequest, QueryResponse, Profile, Workspace, ChatSession, ChatMessage
 from backend.api.auth import get_current_user
 from backend.services.agents import get_orchestrator
 
@@ -14,79 +15,100 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/query", tags=["query"])
 
+def get_user_workspace(db: Session, user_id: uuid.UUID) -> uuid.UUID:
+    """Helper to get or create the default workspace for a user."""
+    workspace = db.query(Workspace).filter(Workspace.owner_id == user_id).first()
+    if not workspace:
+        workspace = Workspace(owner_id=user_id, name="Personal Workspace")
+        db.add(workspace)
+        db.commit()
+        db.refresh(workspace)
+    return workspace.id
 
 @router.post("/ask", response_model=QueryResponse)
 async def ask_query(
     query_request: QueryRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Execute multi-agent reasoning pipeline with optional memory retrieval.
-    
-    This endpoint:
-    1. Validates user authentication
-    2. Executes multi-agent pipeline (planner, retriever, reasoner, validator, MCP tools)
-    3. Stores interaction for training and analysis
-    4. Returns structured insights, connections, actions, and tool_events
+    Execute multi-agent reasoning pipeline.
     """
     user_id = current_user.id
-
+    workspace_id = get_user_workspace(db, user_id)
     
     try:
         logger.info(f"Processing query for user {user_id}: {query_request.query}")
         
-        import uuid
-        session_id = query_request.session_id or str(uuid.uuid4())
+        session_id = query_request.session_id
         
-        # Get chat history (last 10 interactions)
-        history = db.query(Interaction).filter(
-            Interaction.user_id == user_id,
-            Interaction.session_id == session_id
-        ).order_by(Interaction.created_at.desc()).limit(10).all()
+        if not session_id:
+            # Create a new session
+            new_session = ChatSession(
+                workspace_id=workspace_id,
+                title=query_request.query[:50] + "..." if len(query_request.query) > 50 else query_request.query,
+                created_by=user_id
+            )
+            db.add(new_session)
+            db.commit()
+            db.refresh(new_session)
+            session_id = new_session.id
+        else:
+            # Verify session ownership
+            session = db.query(ChatSession).filter(
+                ChatSession.id == session_id,
+                ChatSession.workspace_id == workspace_id
+            ).first()
+            if not session:
+                raise HTTPException(status_code=404, detail="Chat session not found")
+        
+        # Save user message
+        user_msg = ChatMessage(
+            session_id=session_id,
+            role="user",
+            content=query_request.query
+        )
+        db.add(user_msg)
+        db.commit()
+        
+        # Get chat history (last 10 messages)
+        history = db.query(ChatMessage).filter(
+            ChatMessage.session_id == session_id
+        ).order_by(ChatMessage.created_at.desc()).limit(10).all()
         
         chat_history = []
         for h in reversed(history):
-            chat_history.append({"role": "user", "content": h.query})
-            answer = h.response.get("insights", "") if isinstance(h.response, dict) else ""
-            if answer:
-                chat_history.append({"role": "assistant", "content": answer})
+            chat_history.append({"role": h.role, "content": h.content})
         
-        # Call async pipeline directly (no event loop conflict)
+        # Call async pipeline
         orchestrator = get_orchestrator()
+        # Profile might not be a dict anymore, but LangGraph might expect dict
+        profile_dict = {"full_name": current_user.full_name}
+        
         result = await orchestrator._async_execute(
             user_id=user_id,
+            workspace_id=workspace_id,
             user_query=query_request.query,
-            user_profile=user.profile,
+            user_profile=profile_dict,
             chat_history=chat_history
         )
         
-        # Store interaction
-        interaction = Interaction(
-            user_id=user_id,
+        insights = result.get("insights", "")
+        
+        # Save assistant message
+        assistant_msg = ChatMessage(
             session_id=session_id,
-            query=query_request.query,
-            response={
-                "insights": result.get("insights", ""),
-                "connections": result.get("connections", ""),
-                "actions": result.get("actions", "")
-            },
-            context_used=result.get("context", []),
-            agent_logs=result.get("agent_logs", {})
+            role="assistant",
+            content=insights
         )
-        db.add(interaction)
+        db.add(assistant_msg)
         db.commit()
         
-        logger.info(f"Interaction {interaction.id} stored for user {user_id}")
-        
         return QueryResponse(
-            insights=result.get("insights", ""),
-            connections=result.get("connections", ""),
-            actions=result.get("actions", ""),
-            context=result.get("context", []),
-            agent_logs=result.get("agent_logs", {}),
+            response=insights,
             session_id=session_id,
-            tool_events=result.get("tool_events", []),
+            context_used=result.get("context", []),
+            agent_logs=result.get("agent_logs", {})
         )
     
     except Exception as e:
@@ -99,28 +121,20 @@ async def ask_query(
 
 @router.get("/sessions")
 def get_sessions(
-    current_user: User = Depends(get_current_user),
+    current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get user's chat sessions."""
     user_id = current_user.id
+    workspace_id = get_user_workspace(db, user_id)
     
     try:
-        from sqlalchemy import func
-        # Find distinct sessions and their first query to use as a title
-        subq = db.query(
-            Interaction.session_id,
-            func.min(Interaction.created_at).label('min_created_at')
-        ).filter(Interaction.user_id == user_id).group_by(Interaction.session_id).subquery()
-        
-        sessions = db.query(Interaction).join(
-            subq,
-            (Interaction.session_id == subq.c.session_id) & 
-            (Interaction.created_at == subq.c.min_created_at)
-        ).order_by(Interaction.created_at.desc()).all()
+        sessions = db.query(ChatSession).filter(
+            ChatSession.workspace_id == workspace_id
+        ).order_by(ChatSession.created_at.desc()).all()
         
         return {
-            "sessions": [{"id": s.session_id, "title": s.query[:50] + "..." if len(s.query) > 50 else s.query, "created_at": s.created_at} for s in sessions]
+            "sessions": [{"id": s.id, "title": s.title, "created_at": s.created_at} for s in sessions]
         }
     except Exception as e:
         logger.error(f"Error retrieving sessions: {e}")
@@ -132,27 +146,27 @@ def get_sessions(
 
 @router.delete("/sessions/{session_id}")
 def delete_session(
-    session_id: str,
-    current_user: User = Depends(get_current_user),
+    session_id: uuid.UUID,
+    current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Delete a chat session entirely."""
     user_id = current_user.id
+    workspace_id = get_user_workspace(db, user_id)
     
     try:
-        interactions = db.query(Interaction).filter(
-            Interaction.user_id == user_id,
-            Interaction.session_id == session_id
-        ).all()
+        session = db.query(ChatSession).filter(
+            ChatSession.id == session_id,
+            ChatSession.workspace_id == workspace_id
+        ).first()
         
-        if not interactions:
+        if not session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Session not found"
             )
             
-        for i in interactions:
-            db.delete(i)
+        db.delete(session)
         db.commit()
         
         return {"message": "Session deleted successfully"}
@@ -168,28 +182,38 @@ def delete_session(
 @router.get("/history")
 def get_query_history(
     skip: int = 0,
-    limit: int = 10,
-    session_id: str = None,
-    current_user: User = Depends(get_current_user),
+    limit: int = 50,
+    session_id: uuid.UUID = None,
+    current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get user's query history with pagination."""
+    """Get messages for a specific session."""
     user_id = current_user.id
+    workspace_id = get_user_workspace(db, user_id)
     
-    try:
-        query = db.query(Interaction).filter(Interaction.user_id == user_id)
-        if session_id:
-            query = query.filter(Interaction.session_id == session_id)
-            
-        interactions = query.order_by(Interaction.created_at.desc()).offset(skip).limit(limit).all()
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required")
         
-        total = query.count()
+    try:
+        # Verify ownership
+        session = db.query(ChatSession).filter(
+            ChatSession.id == session_id,
+            ChatSession.workspace_id == workspace_id
+        ).first()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+            
+        messages = db.query(ChatMessage).filter(
+            ChatMessage.session_id == session_id
+        ).order_by(ChatMessage.created_at.asc()).offset(skip).limit(limit).all()
+        
+        total = db.query(ChatMessage).filter(ChatMessage.session_id == session_id).count()
         
         return {
             "total": total,
             "skip": skip,
             "limit": limit,
-            "interactions": interactions
+            "interactions": messages # Frontend might need adaptation if it expects 'interactions' format
         }
     except Exception as e:
         logger.error(f"Error retrieving query history: {e}")
@@ -201,22 +225,23 @@ def get_query_history(
 
 @router.get("/{interaction_id}")
 def get_interaction(
-    interaction_id: int,
-    current_user: User = Depends(get_current_user),
+    interaction_id: uuid.UUID,
+    current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get details of a specific interaction."""
+    """Get details of a specific message."""
     user_id = current_user.id
+    workspace_id = get_user_workspace(db, user_id)
     
-    interaction = db.query(Interaction).filter(
-        Interaction.id == interaction_id,
-        Interaction.user_id == user_id
+    message = db.query(ChatMessage).join(ChatSession).filter(
+        ChatMessage.id == interaction_id,
+        ChatSession.workspace_id == workspace_id
     ).first()
     
-    if not interaction:
+    if not message:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Interaction not found"
+            detail="Message not found"
         )
     
-    return interaction
+    return message

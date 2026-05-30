@@ -2,33 +2,32 @@
 Retrieval service for RAG pipeline.
 """
 import logging
-from typing import List, Dict
+from typing import List, Dict, Any
+import uuid
 
 from backend.db.vector_store import get_vector_store
-from backend.services.embedding import get_embedding_service
 
 logger = logging.getLogger(__name__)
 
 
 class RetrievalService:
-    """Service for retrieving relevant context from memory."""
+    """Service for retrieving relevant context from memory using pgvector."""
     
     def __init__(self):
         """Initialize retrieval service."""
         self.vector_store = get_vector_store()
-        self.embedding_service = get_embedding_service()
     
     def retrieve_context(
         self,
-        user_id: int,
+        workspace_id: uuid.UUID,
         query: str,
         top_k: int = 5
-    ) -> List[Dict[str, str]]:
+    ) -> List[Dict[str, Any]]:
         """
-        Retrieve relevant documents from user's memory.
+        Retrieve relevant documents from user's workspace.
         
         Args:
-            user_id: User ID
+            workspace_id: User Workspace ID
             query: Query text
             top_k: Number of documents to retrieve
             
@@ -36,14 +35,14 @@ class RetrievalService:
             List of relevant documents with metadata
         """
         try:
-            # Search in vector store
+            # Search in vector store (now pgvector)
             results = self.vector_store.search(
-                user_id=user_id,
+                workspace_id=workspace_id,
                 query=query,
                 top_k=top_k
             )
             
-            logger.info(f"Retrieved {len(results)} documents for user {user_id}")
+            logger.info(f"Retrieved {len(results)} documents for workspace {workspace_id}")
             return results
         except Exception as e:
             logger.error(f"Error retrieving context: {e}")
@@ -51,7 +50,7 @@ class RetrievalService:
     
     def format_context(
         self,
-        documents: List[Dict[str, str]],
+        documents: List[Dict[str, Any]],
         max_context_length: int = 2000
     ) -> str:
         """
@@ -72,10 +71,9 @@ class RetrievalService:
         
         for doc in documents:
             content = doc.get("content", "")
-            relevance = 1 - doc.get("distance", 0)  # Convert distance to relevance
             
             # Add context header
-            part = f"[Relevance: {relevance:.2f}]\n{content}\n"
+            part = f"- {content}\n"
             
             if total_length + len(part) <= max_context_length:
                 context_parts.append(part)
@@ -84,28 +82,6 @@ class RetrievalService:
                 break
         
         return "\n".join(context_parts) if context_parts else "No relevant context found."
-    
-    def rank_documents(
-        self,
-        documents: List[Dict[str, str]],
-        query: str
-    ) -> List[Dict[str, str]]:
-        """
-        Rank documents by relevance to query.
-        
-        Args:
-            documents: Documents to rank
-            query: Query for ranking
-            
-        Returns:
-            Sorted documents by relevance
-        """
-        # Documents are already ranked by vector similarity from ChromaDB
-        # Additional ranking can be applied here if needed
-        return sorted(
-            documents,
-            key=lambda x: x.get("distance", float('inf'))
-        )
 
 
 # Global retrieval service instance

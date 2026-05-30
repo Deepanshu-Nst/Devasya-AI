@@ -22,9 +22,6 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_JWT_SECRET: str = ""
     
-    # Vector Database (ChromaDB)
-    CHROMA_PATH: str = "./data/chroma"
-    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     
     # LLM
     LLM_PROVIDER: str = "openai"  # "openai" or "groq"

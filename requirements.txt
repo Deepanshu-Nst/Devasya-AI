@@ -10,8 +10,10 @@ backoff==2.2.1
 bcrypt==4.1.1
 certifi==2026.4.22
 charset-normalizer==3.4.7
-chroma-hnswlib==0.7.3
-chromadb==0.4.21
+pgvector==0.2.5
+supabase==2.4.6
+PyPDF2==3.0.1
+python-docx==1.1.0
 click==8.3.3
 dataclasses-json==0.6.7
 distro==1.9.0
