@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = "backend/.env"
         case_sensitive = True
+        extra = "ignore"
 
 
 settings = Settings()

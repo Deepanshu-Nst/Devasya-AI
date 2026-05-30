@@ -122,7 +122,7 @@ def list_memories(
 
 @router.get("/{memory_id}", response_model=MemoryResponse)
 def get_memory(
-    memory_id: uuid.UUID,
+    memory_id: str,
     current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -130,8 +130,13 @@ def get_memory(
     user_id = current_user.id
     workspaces = db.query(Workspace.id).filter(Workspace.owner_id == user_id).subquery()
     
+    try:
+        mem_uuid = uuid.UUID(memory_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid memory ID")
+    
     memory = db.query(MemoryPage).filter(
-        MemoryPage.id == memory_id,
+        MemoryPage.id == mem_uuid,
         MemoryPage.workspace_id.in_(workspaces)
     ).first()
     
@@ -146,7 +151,7 @@ def get_memory(
 
 @router.put("/{memory_id}", response_model=MemoryResponse)
 def update_memory(
-    memory_id: uuid.UUID,
+    memory_id: str,
     memory_update: MemoryCreate,
     current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -155,8 +160,13 @@ def update_memory(
     user_id = current_user.id
     workspaces = db.query(Workspace.id).filter(Workspace.owner_id == user_id).subquery()
     
+    try:
+        mem_uuid = uuid.UUID(memory_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid memory ID")
+        
     memory = db.query(MemoryPage).filter(
-        MemoryPage.id == memory_id,
+        MemoryPage.id == mem_uuid,
         MemoryPage.workspace_id.in_(workspaces)
     ).first()
     
@@ -203,7 +213,7 @@ def update_memory(
 
 @router.delete("/{memory_id}")
 def delete_memory(
-    memory_id: uuid.UUID,
+    memory_id: str,
     current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -211,8 +221,14 @@ def delete_memory(
     user_id = current_user.id
     workspaces = db.query(Workspace.id).filter(Workspace.owner_id == user_id).subquery()
     
+    try:
+        mem_uuid = uuid.UUID(memory_id)
+    except ValueError:
+        # If it's a temporary ID from the frontend that wasn't saved yet, just return success
+        return {"message": "Temporary memory deleted"}
+        
     memory = db.query(MemoryPage).filter(
-        MemoryPage.id == memory_id,
+        MemoryPage.id == mem_uuid,
         MemoryPage.workspace_id.in_(workspaces)
     ).first()
     

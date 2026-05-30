@@ -56,7 +56,7 @@ def get_current_user(
         
         if not profile:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
+                status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User profile not found. Database trigger may have failed."
             )
             

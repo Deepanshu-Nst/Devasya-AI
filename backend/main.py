@@ -122,6 +122,11 @@ def health_check():
     }
 
 
+@app.get("/routes")
+def list_routes():
+    return [route.path for route in app.routes]
+
+
 @app.get("/")
 def root():
     """Root endpoint with API information."""
