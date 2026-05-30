@@ -50,8 +50,11 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Retrieval service disabled: {e}")
         
-        get_orchestrator()
-        logger.info("✓ Multi-agent orchestrator initialized")
+        try:
+            get_orchestrator()
+            logger.info("✓ Multi-agent orchestrator initialized")
+        except Exception as e:
+            logger.warning(f"Orchestrator disabled: {e}")
         
         # Initialize MCP tool registry (registers all tools at startup)
         from backend.mcp.registry import _auto_register_all_tools
