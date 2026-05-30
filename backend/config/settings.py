@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     
     # Supabase Auth
     SUPABASE_URL: str = ""
-    SUPABASE_JWT_SECRET: str = ""
+    SUPABASE_ANON_KEY: str = ""
     
     
     # LLM

@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/memory", tags=["memory"])
 # (Alternatively, the user could upload directly from the frontend)
 supabase: Client = create_client(
     settings.SUPABASE_URL, 
-    os.environ.get("SUPABASE_SERVICE_ROLE_KEY", settings.SUPABASE_JWT_SECRET) # Fallback to secret if not set
+    os.environ.get("SUPABASE_SERVICE_ROLE_KEY", settings.SUPABASE_ANON_KEY) # Fallback to anon key if not set
 )
 
 def get_user_workspace(db: Session, user_id: uuid.UUID) -> uuid.UUID:
