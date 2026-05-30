@@ -68,10 +68,35 @@ async def execute_tool_directly(
 
     from backend.mcp.executor import _execute_single_tool
     from backend.mcp.context import build_user_context
+    from backend.db.postgres import get_db
+    from backend.models.schema import Profile
+    import uuid
+
+    # Fetch profile and workspace to populate memory for the tool
+    memory_summary = ""
+    try:
+        db = next(get_db())
+        user_uuid = uuid.UUID(user_id)
+        profile = db.query(Profile).filter(Profile.id == user_uuid).first()
+        
+        if profile and profile.workspaces:
+            workspace_id = profile.workspaces[0].id
+            from backend.services.retrieval import get_retrieval_service
+            retrieval_service = get_retrieval_service()
+            # Generic query to fetch resume/career info for tool context
+            docs = retrieval_service.retrieve_context(
+                workspace_id=workspace_id,
+                query="resume cv career history " + request.tool_name,
+                top_k=5
+            )
+            memory_summary = retrieval_service.format_context(docs)
+    except Exception as e:
+        logger.error(f"Error fetching memory for MCP tool: {e}")
 
     user_ctx = build_user_context(
         user_profile=request.user_profile,
-        has_uploaded_documents=True,  # Assume docs may exist for direct calls
+        memory_summary=memory_summary,
+        has_uploaded_documents=bool(memory_summary),
     )
 
     tool_call = ToolCall(
