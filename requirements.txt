@@ -79,8 +79,7 @@ pillow==12.2.0
 posthog==7.13.1
 propcache==0.4.1
 protobuf==6.33.6
-psycopg==3.2.13
-psycopg-binary==3.2.13
+psycopg2-binary==2.9.9
 pulsar-client==3.11.0
 pydantic>=2.7,<3
 pydantic-settings==2.1.0
