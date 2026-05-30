@@ -8,7 +8,7 @@ import logging
 from backend.db.postgres import get_db
 from backend.db.vector_store import get_vector_store
 from backend.models.schema import Memory, MemoryCreate, MemoryResponse, User
-from backend.api.auth import get_current_user, decode_token
+from backend.api.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -18,27 +18,12 @@ router = APIRouter(prefix="/api/memory", tags=["memory"])
 @router.post("/add", response_model=MemoryResponse)
 def add_memory(
     memory_data: MemoryCreate,
-    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Add a new memory to user's knowledge base."""
-    # Validate token
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header"
-        )
-    
-    token = authorization.split("Bearer ")[1]
-    user_id = decode_token(token)
-    
-    # Verify user exists
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+    user_id = current_user.id
+
     
     try:
         # Create memory record in PostgreSQL
@@ -85,19 +70,11 @@ def add_memory(
 def list_memories(
     skip: int = 0,
     limit: int = 10,
-    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """List user's memories with pagination."""
-    # Validate token
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header"
-        )
-    
-    token = authorization.split("Bearer ")[1]
-    user_id = decode_token(token)
+    user_id = current_user.id
     
     try:
         memories = db.query(Memory).filter(
@@ -127,19 +104,11 @@ def list_memories(
 @router.get("/{memory_id}", response_model=MemoryResponse)
 def get_memory(
     memory_id: int,
-    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get a specific memory."""
-    # Validate token
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header"
-        )
-    
-    token = authorization.split("Bearer ")[1]
-    user_id = decode_token(token)
+    user_id = current_user.id
     
     memory = db.query(Memory).filter(
         Memory.id == memory_id,
@@ -159,7 +128,7 @@ def get_memory(
 def update_memory(
     memory_id: int,
     memory_update: MemoryCreate,
-    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Edit memory details."""
@@ -225,19 +194,11 @@ def update_memory(
 @router.delete("/{memory_id}")
 def delete_memory(
     memory_id: int,
-    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Delete a memory."""
-    # Validate token
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header"
-        )
-    
-    token = authorization.split("Bearer ")[1]
-    user_id = decode_token(token)
+    user_id = current_user.id
     
     memory = db.query(Memory).filter(
         Memory.id == memory_id,
@@ -275,27 +236,12 @@ def delete_memory(
 @router.post("/upload", response_model=list[MemoryResponse])
 async def upload_document(
     file: UploadFile = File(...),
-    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Upload a document, parse it, and store as memory chunks."""
-    # Validate token
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header"
-        )
-    
-    token = authorization.split("Bearer ")[1]
-    user_id = decode_token(token)
-    
-    # Verify user exists
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+    user_id = current_user.id
+
     
     try:
         from backend.services.document_parser import extract_text_from_file, chunk_text

@@ -1,184 +1,89 @@
 """
-Authentication endpoints and utilities for Devasya AI.
+Authentication endpoints and utilities for Devasya AI (Supabase Managed).
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
 import jwt
-import bcrypt
 import logging
-from pydantic import EmailStr
 
 from backend.config.settings import settings
 from backend.db.postgres import get_db
-from backend.models.schema import User, UserCreate, UserResponse, UserProfileUpdate
+from backend.models.schema import User, UserResponse, UserProfileUpdate
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-
-def hash_password(password: str) -> str:
-    """Hash a password using bcrypt directly."""
-    password_bytes = password.encode("utf-8")
-    salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password_bytes, salt)
-    return hashed.decode("utf-8")
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    return bcrypt.checkpw(
-        plain_password.encode("utf-8"),
-        hashed_password.encode("utf-8"),
-    )
-
-
-def create_access_token(user_id: int, expires_delta: timedelta = None) -> str:
+def get_current_user(
+    authorization: str = Header(None),
+    db: Session = Depends(get_db)
+) -> User:
     """
-    Create a JWT access token.
+    Get current authenticated user from Supabase JWT token.
+    Auto-provisions local User record if it doesn't exist.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid authorization header"
+        )
     
-    Args:
-        user_id: User ID to encode
-        expires_delta: Token expiration time
-        
-    Returns:
-        JWT token string
-    """
-    if expires_delta is None:
-        expires_delta = timedelta(hours=settings.JWT_EXPIRATION_HOURS)
+    token = authorization.split("Bearer ")[1]
     
-    expire = datetime.utcnow() + expires_delta
-    to_encode = {"sub": str(user_id), "exp": expire}
-    encoded_jwt = jwt.encode(
-        to_encode,
-        settings.JWT_SECRET_KEY,
-        algorithm=settings.JWT_ALGORITHM
-    )
-    return encoded_jwt
-
-
-def decode_token(token: str) -> int:
-    """
-    Decode and validate JWT token.
-    
-    Args:
-        token: JWT token string
-        
-    Returns:
-        User ID from token
-        
-    Raises:
-        HTTPException: If token is invalid or expired
-    """
     try:
+        # Supabase uses HS256 algorithm by default
         payload = jwt.decode(
             token,
-            settings.JWT_SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM]
+            settings.SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False} # Supabase aud can vary
         )
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        
+        email: str = payload.get("email")
+        if not email:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token"
+                detail="Invalid token: no email found"
             )
-        return int(user_id)
+            
+        # Find user locally
+        user = db.query(User).filter(User.email == email).first()
+        
+        if not user:
+            # Auto-provision local user from Supabase token metadata
+            user_metadata = payload.get("user_metadata", {})
+            name = user_metadata.get("full_name") or user_metadata.get("name")
+            picture = user_metadata.get("avatar_url") or user_metadata.get("picture")
+            
+            user = User(
+                email=email,
+                full_name=name,
+                profile={"picture": picture} if picture else None
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            logger.info(f"Auto-provisioned local user from Supabase: {email}")
+            
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is inactive"
+            )
+            
+        return user
+        
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired"
         )
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as e:
+        logger.error(f"Invalid Supabase JWT: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token"
         )
-
-
-def get_current_user(
-    token: str,
-    db: Session = Depends(get_db)
-) -> User:
-    """
-    Get current authenticated user from token.
-    
-    Args:
-        token: JWT token from header
-        db: Database session
-        
-    Returns:
-        User object
-        
-    Raises:
-        HTTPException: If user not found or token invalid
-    """
-    user_id = decode_token(token)
-    user = db.query(User).filter(User.id == user_id).first()
-    
-    if not user or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive"
-        )
-    
-    return user
-
-
-@router.post("/register", response_model=UserResponse)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user."""
-    # Check if user already exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered"
-        )
-    
-    # Create new user
-    new_user = User(
-        email=user_data.email,
-        password_hash=hash_password(user_data.password),
-        full_name=user_data.full_name,
-    )
-    
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    logger.info(f"User registered: {new_user.email}")
-    return new_user
-
-
-@router.post("/login")
-def login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    """Login with email and password."""
-    # Find user
-    user = db.query(User).filter(User.email == email).first()
-    
-    if not user or not verify_password(password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
-        )
-    
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
-        )
-    
-    # Create access token
-    access_token = create_access_token(user.id)
-    
-    logger.info(f"User logged in: {user.email}")
-    
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": UserResponse.from_orm(user)
-    }
 
 
 @router.get("/me", response_model=UserResponse)

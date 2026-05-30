@@ -16,7 +16,6 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=True)
     profile = Column(JSON, nullable=True)
     is_active = Column(Boolean, default=True)
@@ -71,7 +70,6 @@ from typing import Optional, Any
 class UserCreate(BaseModel):
     """Schema for user registration."""
     email: EmailStr
-    password: str
     full_name: Optional[str] = None
 
 

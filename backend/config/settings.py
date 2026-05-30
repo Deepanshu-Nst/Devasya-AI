@@ -18,10 +18,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/devasya_db"
     
-    # JWT
-    JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
-    JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRATION_HOURS: int = 24
+    # Supabase Auth
+    SUPABASE_URL: str = ""
+    SUPABASE_JWT_SECRET: str = ""
     
     # Vector Database (ChromaDB)
     CHROMA_PATH: str = "./data/chroma"
@@ -43,7 +42,7 @@ class Settings(BaseSettings):
     
     # CORS
     CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:8000"]
-    
+
     class Config:
         env_file = "backend/.env"
         case_sensitive = True

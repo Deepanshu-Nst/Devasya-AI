@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface ApiResponse<T> {
@@ -8,34 +10,19 @@ interface ApiResponse<T> {
 
 class ApiClient {
   private baseUrl: string;
-  private token: string | null = null;
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('auth-store');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        this.token = parsed.state?.token;
-      }
-    }
   }
 
-  setToken(token: string) {
-    this.token = token;
-  }
-
-  clearToken() {
-    this.token = null;
-  }
-
-  private getHeaders(): Record<string, string> {
+  private async getHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
     }
 
     return headers;
@@ -50,7 +37,7 @@ class ApiClient {
       const url = `${this.baseUrl}${endpoint}`;
       const options: RequestInit = {
         method,
-        headers: this.getHeaders(),
+        headers: await this.getHeaders(),
       };
 
       if (data) {
@@ -105,11 +92,15 @@ class ApiClient {
         }
       }
 
+      const headers: Record<string, string> = {};
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const options: RequestInit = {
         method,
-        headers: {
-          'Authorization': this.token ? `Bearer ${this.token}` : '',
-        },
+        headers,
         body: bodyData,
       };
 
@@ -142,12 +133,6 @@ export const apiClient = new ApiClient();
 
 // Auth endpoints
 export const authApi = {
-  register: (email: string, password: string, fullName?: string) =>
-    apiClient.post('/api/auth/register', { email, password, full_name: fullName }),
-
-  login: (email: string, password: string) =>
-    apiClient.post('/api/auth/login', { email, password }, true), // Use form data
-
   getMe: () => apiClient.get('/api/auth/me'),
 };
 

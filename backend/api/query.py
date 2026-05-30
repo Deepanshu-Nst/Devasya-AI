@@ -7,7 +7,7 @@ import logging
 
 from backend.db.postgres import get_db
 from backend.models.schema import QueryRequest, QueryResponse, User, Interaction
-from backend.api.auth import decode_token
+from backend.api.auth import get_current_user
 from backend.services.agents import get_orchestrator
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/query", tags=["query"])
 @router.post("/ask", response_model=QueryResponse)
 async def ask_query(
     query_request: QueryRequest,
-    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -30,23 +30,8 @@ async def ask_query(
     3. Stores interaction for training and analysis
     4. Returns structured insights, connections, actions, and tool_events
     """
-    # Validate token
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header"
-        )
-    
-    token = authorization.split("Bearer ")[1]
-    user_id = decode_token(token)
-    
-    # Verify user exists
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+    user_id = current_user.id
+
     
     try:
         logger.info(f"Processing query for user {user_id}: {query_request.query}")
@@ -114,19 +99,11 @@ async def ask_query(
 
 @router.get("/sessions")
 def get_sessions(
-    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get user's chat sessions."""
-    # Validate token
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header"
-        )
-    
-    token = authorization.split("Bearer ")[1]
-    user_id = decode_token(token)
+    user_id = current_user.id
     
     try:
         from sqlalchemy import func
@@ -156,18 +133,11 @@ def get_sessions(
 @router.delete("/sessions/{session_id}")
 def delete_session(
     session_id: str,
-    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Delete a chat session entirely."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header"
-        )
-    
-    token = authorization.split("Bearer ")[1]
-    user_id = decode_token(token)
+    user_id = current_user.id
     
     try:
         interactions = db.query(Interaction).filter(
@@ -200,19 +170,11 @@ def get_query_history(
     skip: int = 0,
     limit: int = 10,
     session_id: str = None,
-    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get user's query history with pagination."""
-    # Validate token
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header"
-        )
-    
-    token = authorization.split("Bearer ")[1]
-    user_id = decode_token(token)
+    user_id = current_user.id
     
     try:
         query = db.query(Interaction).filter(Interaction.user_id == user_id)
@@ -240,19 +202,11 @@ def get_query_history(
 @router.get("/{interaction_id}")
 def get_interaction(
     interaction_id: int,
-    authorization: str = Header(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get details of a specific interaction."""
-    # Validate token
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header"
-        )
-    
-    token = authorization.split("Bearer ")[1]
-    user_id = decode_token(token)
+    user_id = current_user.id
     
     interaction = db.query(Interaction).filter(
         Interaction.id == interaction_id,
