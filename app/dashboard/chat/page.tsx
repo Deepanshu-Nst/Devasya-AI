@@ -13,6 +13,7 @@ import {
   Trash2,
   AlertCircle,
   Plus,
+  User,
 } from 'lucide-react';
 import { queryApi, memoryApi } from '@/lib/api-client';
 import { useRouter } from 'next/navigation';
