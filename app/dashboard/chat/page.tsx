@@ -408,7 +408,7 @@ export default function ChatMode() {
                                     className="pl-4 space-y-4 py-2"
                                     style={{ borderLeft: '1px solid oklch(0.20 0 0)' }}
                                   >
-                                    {m.context && m.context.length > 0 && (
+                                    {Array.isArray(m.context) && m.context.length > 0 && (
                                       <div className="flex items-center gap-2">
                                         <FileText className="w-3.5 h-3.5" style={{ color: 'oklch(0.65 0.20 250)' }} />
                                         <span className="text-[12px]" style={{ color: 'oklch(0.50 0 0)' }}>{m.context[0]}</span>
@@ -434,7 +434,7 @@ export default function ChatMode() {
                         )}
 
                         {/* Follow-up actions (only on AI messages) */}
-                        {m.role === 'assistant' && m.actions && m.actions.length > 0 && (
+                        {m.role === 'assistant' && Array.isArray(m.actions) && m.actions.length > 0 && (
                           <div className="mt-8 flex flex-wrap gap-2 max-w-[65ch]">
                             {m.actions.map((action: string) => (
                               <button
