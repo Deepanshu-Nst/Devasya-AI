@@ -12,7 +12,7 @@ from supabase import create_client, Client
 from backend.config.settings import settings
 from backend.db.postgres import get_db
 from backend.db.vector_store import get_vector_store
-from backend.models.schema import MemoryPage, Document, Profile, Workspace, MemoryCreate, MemoryResponse
+from backend.models.schema import MemoryPage, Document, Profile, Workspace, MemoryCreate, MemoryResponse, DocumentChunk
 from backend.api.auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,8 @@ def add_memory(
                 f"Embedding failed for memory {new_memory.id} (content saved, search degraded): {embed_err}"
             )
         
-        return new_memory
+        resp = MemoryResponse.model_validate(new_memory)
+        return resp.model_dump()
     
     except Exception as e:
         db.rollback()
@@ -100,25 +101,62 @@ def list_memories(
     user_id = current_user.id
     
     try:
-        # User can see any memory page in their workspaces
+        # Get all workspace IDs owned by user
         workspaces = db.query(Workspace.id).filter(Workspace.owner_id == user_id).subquery()
         
-        memories = db.query(MemoryPage).filter(
+        # ── 1. Memory Pages (user-written notes) ─────────────────────────────
+        memory_pages = db.query(MemoryPage).filter(
             MemoryPage.workspace_id.in_(workspaces)
-        ).offset(skip).limit(limit).all()
+        ).all()
         
-        total = db.query(MemoryPage).filter(
-            MemoryPage.workspace_id.in_(workspaces)
-        ).count()
+        # Pydantic v2 uses model_validate() instead of from_orm()
+        memories_out = []
+        for m in memory_pages:
+            try:
+                memories_out.append(MemoryResponse.model_validate(m))
+            except Exception:
+                # Fallback for any ORM mapping edge cases
+                memories_out.append(MemoryResponse(
+                    id=m.id,
+                    workspace_id=m.workspace_id,
+                    title=m.title,
+                    content=m.content,
+                    visibility=m.visibility or "private",
+                    created_at=m.created_at,
+                ))
+        
+        # ── 2. Uploaded Documents (show as separate cards in the sidebar) ────
+        # Documents are stored in the `documents` table, NOT `memory_pages`.
+        # We convert them to a compatible shape so the frontend can render them.
+        documents = db.query(Document).filter(
+            Document.workspace_id.in_(workspaces)
+        ).all()
+        
+        for doc in documents:
+            # Represent each document as a pseudo-MemoryResponse with meta_data
+            memories_out.append(MemoryResponse(
+                id=doc.id,
+                workspace_id=doc.workspace_id,
+                title=doc.file_name,
+                content=f"Document: {doc.file_name} ({doc.embedding_status})",
+                visibility="private",
+                created_at=doc.created_at,
+                meta_data={"type": "document", "source": doc.file_name, "status": doc.embedding_status}
+            ))
+        
+        total = len(memories_out)
+        # Apply pagination after merge
+        paginated = memories_out[skip: skip + limit]
         
         return {
             "total": total,
             "skip": skip,
             "limit": limit,
-            "memories": [MemoryResponse.from_orm(m) for m in memories]
+            "memories": [m.model_dump() for m in paginated]
         }
     except Exception as e:
-        logger.error(f"Error listing memories: {e}")
+        import traceback
+        logger.error(f"Error listing memories: {e}\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error listing memories: {str(e)}"
@@ -151,7 +189,7 @@ def get_memory(
             detail="Memory not found"
         )
     
-    return memory
+    return MemoryResponse.model_validate(memory).model_dump()
 
 
 @router.put("/{memory_id}", response_model=MemoryResponse)
@@ -208,7 +246,7 @@ def update_memory(
         except Exception as embed_err:
             logger.warning(f"Re-embedding failed for memory {memory.id} (content updated, search degraded): {embed_err}")
         
-        return memory
+        return MemoryResponse.model_validate(memory).model_dump()
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating memory: {e}")

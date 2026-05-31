@@ -152,16 +152,25 @@ class MemoryCreate(BaseModel):
     visibility: Optional[str] = "private"
 
 class MemoryResponse(BaseModel):
-    """Schema for memory response."""
+    """Schema for memory response. Used for both notes and documents (unified list)."""
     id: uuid.UUID
     workspace_id: uuid.UUID
-    title: Optional[str]
+    title: Optional[str] = None
     content: str
-    visibility: str
+    visibility: str = "private"
     created_at: datetime
-    
+    # meta_data: carries document type/source info for uploaded files
+    meta_data: Optional[Any] = None
+
     class Config:
-        from_attributes = True
+        from_attributes = True  # Pydantic v2: enables ORM mode (model_validate())
+
+class MemoryListResponse(BaseModel):
+    """Schema for paginated memory list response."""
+    memories: List[Any]  # List of MemoryResponse dicts (mixed notes + documents)
+    total: int
+    skip: int
+    limit: int
 
 class QueryRequest(BaseModel):
     """Schema for query request."""

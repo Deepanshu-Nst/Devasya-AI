@@ -82,30 +82,27 @@ export default function MemoryMode() {
       if (selectedItem.isNew) {
         const res = await memoryApi.add(editContent, editTitle || undefined);
         if (res.status === 200 && res.data) {
-          // Bug 7 Fix: Properly map the returned MemoryResponse object
           const newMem = res.data as any;
-          // Clear the temp isNew item and add the real one from the server
-          setMemories(prev => {
-            const filtered = prev.filter(m => m.id !== selectedItem.id);
-            return [newMem, ...filtered];
-          });
-          // Update selected item to the real saved item
+          // Reload full list from DB to confirm persistence
+          await loadMemories();
+          // Find the newly created item in the fresh list (by id)
           setSelectedItem(newMem);
           setSaveSuccess(true);
-          setTimeout(() => setSaveSuccess(false), 2000);
+          setTimeout(() => setSaveSuccess(false), 2500);
         } else {
-          setSaveError(res.error || 'Failed to save memory. Please try again.');
+          setSaveError(res.error || 'Failed to save. Please try again.');
         }
       } else if (!selectedItem.isDocInfo) {
         const res = await memoryApi.update(selectedItem.id, editContent, editTitle || undefined);
         if (res.status === 200 && res.data) {
           const updated = res.data as any;
-          setMemories(prev => prev.map(m => m.id === selectedItem.id ? updated : m));
+          // Reload full list from DB to confirm persistence
+          await loadMemories();
           setSelectedItem(updated);
           setSaveSuccess(true);
-          setTimeout(() => setSaveSuccess(false), 2000);
+          setTimeout(() => setSaveSuccess(false), 2500);
         } else {
-          setSaveError(res.error || 'Failed to update memory. Please try again.');
+          setSaveError(res.error || 'Failed to update. Please try again.');
         }
       }
     } catch (e: any) {
