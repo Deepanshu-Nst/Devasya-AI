@@ -7,8 +7,6 @@ export const DatabaseBlock = createReactBlockSpec(
   {
     type: "database_view",
     propSchema: {
-      textAlignment: defaultProps.textAlignment,
-      textColor: defaultProps.textColor,
       entity_type: { default: "task" },
       view_type: { default: "kanban" },
       status_options: { default: "Todo,In Progress,Done" },
