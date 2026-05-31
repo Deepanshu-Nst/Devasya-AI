@@ -71,7 +71,7 @@ export default function LightweightEditor({ initialContent, onChange, editable =
         <SuggestionMenuController
           triggerCharacter={"/"}
           getItems={async (query) =>
-            filterSuggestionItems(getDefaultReactSlashMenuItems(editor), query)
+            filterSuggestionItems(getDefaultReactSlashMenuItems(editor as any), query)
           }
         />
       </BlockNoteView>
