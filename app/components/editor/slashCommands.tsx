@@ -6,13 +6,14 @@ import { DatabaseBlock } from "./blocks/DatabaseBlock";
 export const schema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
-    database_view: DatabaseBlock,
+    // database_view: DatabaseBlock,
   },
 });
 
 // 2. Define custom slash commands
 export const getCustomSlashMenuItems = (editor: typeof schema.BlockNoteEditor) => [
   ...getDefaultReactSlashMenuItems(editor),
+  /*
   {
     title: "Task Kanban",
     onItemClick: () => {
@@ -32,4 +33,5 @@ export const getCustomSlashMenuItems = (editor: typeof schema.BlockNoteEditor) =
     icon: <span className="text-lg">📋</span>,
     subtext: "Insert a Kanban board for tasks.",
   },
+  */
 ];
