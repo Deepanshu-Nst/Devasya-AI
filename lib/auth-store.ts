@@ -1,17 +1,20 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+interface AuthUser {
+  id: string;
+  email: string;
+  full_name?: string;
+  avatar_url?: string | null;
+}
+
 interface AuthState {
-  user: {
-    id: number;
-    email: string;
-    full_name?: string;
-  } | null;
+  user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
-  setAuth: (user: any, token: string) => void;
+  setAuth: (user: AuthUser, token: string) => void;
   logout: () => void;
-  setUser: (user: any) => void;
+  setUser: (user: AuthUser) => void;
 }
 
 export const useAuthStore = create<AuthState>()(

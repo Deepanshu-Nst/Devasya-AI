@@ -54,13 +54,23 @@ async def ask_query(
             db.refresh(new_session)
             session_id = new_session.id
         else:
-            # Verify session ownership
+            # Verify session ownership — if not found, create a fresh one
+            # (handles stale session IDs from localStorage after backend restarts)
             session = db.query(ChatSession).filter(
                 ChatSession.id == session_id,
                 ChatSession.workspace_id == workspace_id
             ).first()
             if not session:
-                raise HTTPException(status_code=404, detail="Chat session not found")
+                logger.warning(f"Session {session_id} not found for workspace {workspace_id} — creating new session")
+                new_session = ChatSession(
+                    workspace_id=workspace_id,
+                    title=query_request.query[:50] + "..." if len(query_request.query) > 50 else query_request.query,
+                    created_by=user_id
+                )
+                db.add(new_session)
+                db.commit()
+                db.refresh(new_session)
+                session_id = new_session.id
         
         # Save user message
         user_msg = ChatMessage(

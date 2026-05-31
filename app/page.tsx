@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/lib/auth-store';
+import { useAuth } from '@/components/auth-provider';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import { ArrowUpRight, Brain, Zap, Shield, Sparkles } from 'lucide-react';
@@ -11,14 +11,15 @@ const MotionDiv = motion.div as any;
 
 export default function Home() {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  // Use real Supabase session — avoids stale localStorage race condition
+  const { user, isLoading } = useAuth();
   const [query, setQuery] = useState('');
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!isLoading && user) {
       router.push('/dashboard/chat');
     }
-  }, [isAuthenticated, router]);
+  }, [user, isLoading, router]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

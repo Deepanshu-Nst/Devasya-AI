@@ -20,11 +20,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/memory", tags=["memory"])
 
 # Initialize Supabase client for storage operations
-# We use SERVICE_ROLE_KEY here to bypass RLS for server-side uploads
-# (Alternatively, the user could upload directly from the frontend)
+# We use SERVICE_ROLE_KEY here to bypass RLS for server-side uploads.
+# Falls back to ANON_KEY if service role key is not configured (storage upload may fail due to RLS).
+_supabase_key = settings.SUPABASE_SERVICE_ROLE_KEY or os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or settings.SUPABASE_ANON_KEY
 supabase: Client = create_client(
-    settings.SUPABASE_URL, 
-    os.environ.get("SUPABASE_SERVICE_ROLE_KEY", settings.SUPABASE_ANON_KEY) # Fallback to anon key if not set
+    settings.SUPABASE_URL,
+    _supabase_key
 )
 
 def get_user_workspace(db: Session, user_id: uuid.UUID) -> uuid.UUID:
@@ -273,16 +274,24 @@ async def upload_document(
         
         file_content = await file.read()
         
-        # 1. Upload to Supabase Storage
+        # 1. Try to upload to Supabase Storage (non-blocking — degrade gracefully if it fails)
+        file_url = ""
         file_path = f"{user_id}/{uuid.uuid4()}_{file.filename}"
-        res = supabase.storage.from_("documents").upload(
-            path=file_path,
-            file=file_content,
-            file_options={"content-type": file.content_type}
-        )
-        
-        # Get public URL
-        file_url = supabase.storage.from_("documents").get_public_url(file_path)
+        try:
+            res = supabase.storage.from_("documents").upload(
+                path=file_path,
+                file=file_content,
+                file_options={"content-type": file.content_type or "application/octet-stream"}
+            )
+            file_url = supabase.storage.from_("documents").get_public_url(file_path)
+            logger.info(f"File uploaded to Supabase Storage: {file_path}")
+        except Exception as storage_err:
+            logger.warning(
+                f"Supabase Storage upload failed (bucket may not exist or RLS policy issue): {storage_err}. "
+                "Continuing with text extraction and embedding only."
+            )
+            # Use a placeholder URL — the file content is still processed
+            file_url = f"local://{file.filename}"
         
         # 2. Extract Text
         text = extract_text_from_file(file_content, file.filename)

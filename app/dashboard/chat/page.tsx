@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, ArrowUpRight, BrainCircuit, FileText, ChevronRight, Plus, ChevronDown, Zap, Brain, Trash2 } from 'lucide-react';
+import { Sparkles, ArrowUpRight, BrainCircuit, FileText, ChevronRight, Plus, ChevronDown, Zap, Brain, Trash2, AlertCircle } from 'lucide-react';
 import { queryApi, memoryApi } from '@/lib/api-client';
 import { useRouter } from 'next/navigation';
 
@@ -29,6 +29,7 @@ export default function ChatMode() {
   const [showEmptyState, setShowEmptyState] = useState(false);
   const [isDeepThinking, setIsDeepThinking] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState<number[]>([]);
+  const [sendError, setSendError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -43,12 +44,16 @@ export default function ChatMode() {
     }
     
     // Load sessions from API
+    loadSessions();
+  }, []);
+
+  const loadSessions = () => {
     queryApi.sessions().then(res => {
       if (res.status === 200 && res.data) {
         setSessions((res.data as any).sessions || []);
       }
-    });
-  }, []);
+    }).catch(() => {});
+  };
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -61,35 +66,34 @@ export default function ChatMode() {
     }
   }, [messages, currentSessionId]);
 
+  // Bug 8 Fix: Correctly map ChatMessage fields (p.role, p.content) from the backend
   const loadSession = async (id: string) => {
     if (id === currentSessionId) return;
     setCurrentSessionId(id);
     setLoading(true);
     setMessages([]);
+    setSendError(null);
     try {
       const res = await queryApi.history(0, 100, id);
       if (res.status === 200 && res.data) {
-         const past = (res.data as any).interactions || [];
-         const formatted: Message[] = [];
-         past.reverse().forEach((p: any) => {
-            formatted.push({role: 'user', content: p.query});
-            formatted.push({
-               role: 'assistant', 
-               content: p.response?.insights || '', 
-               connections: p.response?.connections, 
-               actions: p.response?.actions,
-               context: p.context_used
-            });
-         });
-         setMessages(formatted);
+        const rawMessages = (res.data as any).interactions || [];
+        const formatted: Message[] = rawMessages.map((msg: any) => ({
+          role: msg.role as 'user' | 'assistant',
+          // Backend returns ChatMessage with `content` field, not nested response.insights
+          content: msg.content || '',
+        }));
+        setMessages(formatted);
       }
-    } catch(e) {}
+    } catch(e) {
+      console.error('Failed to load session:', e);
+    }
     setLoading(false);
   };
 
   const startNewChat = () => {
     setCurrentSessionId(null);
     setMessages([]);
+    setSendError(null);
     localStorage.removeItem('devasya_chat');
     localStorage.removeItem('devasya_session_id');
     inputRef.current?.focus();
@@ -116,11 +120,10 @@ export default function ChatMode() {
           setHasMemory(count > 0);
           if (count === 0) {
              setShowEmptyState(true);
-          } else {
-             // We don't render an initial fake message anymore to reduce noise.
-             // But if we want, we can. The user said "User asks -> gets DIRECT answer".
-             // We'll leave it empty.
           }
+        } else {
+          // If we can't check (network error etc.), allow chat anyway
+          setHasMemory(true);
         }
       } catch (e) {
         setHasMemory(true);
@@ -153,6 +156,7 @@ export default function ChatMode() {
     if (!query.trim() || loading) return;
 
     if (showEmptyState) setShowEmptyState(false);
+    setSendError(null);
 
     const userMessage: Message = { role: 'user', content: query };
     setMessages(prev => [...prev, userMessage]);
@@ -160,43 +164,40 @@ export default function ChatMode() {
     setLoading(true);
 
     try {
-      // Pass the currentSessionId if we have one
       const response = await queryApi.ask(userMessage.content, true, currentSessionId || undefined);
+
       if (response.status === 200 && response.data) {
         const resData = response.data as any;
+        
+        // Bug 5 Fix: API QueryResponse has field `response` (not `insights`)
+        // The orchestrator returns `insights` mapped to `response` in query.py
+        const answerText = resData.response || resData.insights || "I processed your request but couldn't generate a response.";
         
         // If it's a new session, backend generated an ID for it
         if (!currentSessionId && resData.session_id) {
            setCurrentSessionId(resData.session_id);
            // Refresh session list
-           queryApi.sessions().then(r => {
-             if (r.status === 200 && r.data) {
-               setSessions((r.data as any).sessions || []);
-             }
-           });
-        }
-
-        const insights = resData.insights || "I processed your request, but couldn't generate specific insights.";
-        
-        let sourceDoc = undefined;
-        if (resData.context && Array.isArray(resData.context)) {
-          // just taking a placeholder source if available
+           loadSessions();
         }
 
         setMessages(prev => [...prev, { 
           role: 'assistant', 
-          content: insights, 
-          source: sourceDoc,
+          content: answerText,
           connections: resData.connections,
           actions: resData.actions,
-          context: resData.context,
+          context: resData.context_used,
           isDeep: isDeepThinking
         }]);
       } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'I encountered an issue processing your query. Please try again.' }]);
+        // Show the actual error from the server if available
+        const errMsg = response.error || 'Failed to get a response from the server.';
+        setSendError(errMsg);
+        setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${errMsg}` }]);
       }
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'There was a system error answering your query. Please try again.' }]);
+    } catch (err: any) {
+      const errMsg = err?.message || 'Network error — check your connection and try again.';
+      setSendError(errMsg);
+      setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${errMsg}` }]);
     } finally {
       setLoading(false);
     }
@@ -215,6 +216,9 @@ export default function ChatMode() {
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-1 no-scrollbar">
+          {sessions.length === 0 && (
+            <p className="text-xs text-muted-foreground px-2 py-4 text-center opacity-60">No conversations yet</p>
+          )}
           {sessions.map(s => (
              <div 
                key={s.id}
@@ -256,7 +260,7 @@ export default function ChatMode() {
               <div className="w-16 h-16 bg-primary/10 text-primary rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-primary/20">
                 <BrainCircuit className="w-8 h-8" />
               </div>
-              <h1 className="text-3xl font-bold tracking-tight mb-3 text-foreground/90">Let's build your intelligence system</h1>
+              <h1 className="text-3xl font-bold tracking-tight mb-3 text-foreground/90">Let&apos;s build your intelligence system</h1>
               <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
                 Start by adding something about you, your work, or uploading your documents.
               </p>
@@ -302,7 +306,7 @@ export default function ChatMode() {
                     </div>
                     
                     {/* Assistant Metadata / Collapsible Thinking */}
-                    {m.role === 'assistant' && (m.connections || m.actions || m.context) && (
+                    {m.role === 'assistant' && (m.connections || m.actions || (m.context && m.context.length > 0)) && (
                       <div className="w-full flex justify-start pl-2">
                         <button 
                           onClick={() => toggleThinking(idx)}
@@ -360,6 +364,15 @@ export default function ChatMode() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Error Banner */}
+      {sendError && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-destructive/10 border border-destructive/30 text-destructive text-sm px-4 py-2 rounded-xl max-w-lg">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span className="truncate">{sendError}</span>
+          <button onClick={() => setSendError(null)} className="ml-2 opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
 
       {/* Input */}
       {hasMemory !== null && !showEmptyState && (

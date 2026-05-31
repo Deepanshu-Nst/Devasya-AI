@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     # Supabase Auth
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
+    # Service role key — used by backend only (never expose to frontend!)
+    # Required for Supabase Storage uploads and bypassing RLS on server-side ops
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
+    
+    # Frontend URL (used for CORS; set on Render/Vercel deploy)
+    FRONTEND_URL: Optional[str] = None
     
     
     # LLM

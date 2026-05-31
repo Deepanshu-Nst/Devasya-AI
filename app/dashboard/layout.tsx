@@ -2,7 +2,9 @@
 
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@/components/auth-provider';
 import { useAuthStore } from '@/lib/auth-store';
+import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, Database, Sparkles, LogOut, User } from 'lucide-react';
 import Link from 'next/link';
@@ -16,18 +18,52 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, logout } = useAuthStore();
+
+  // Bug 1 Fix: Use real Supabase session from AuthProvider, not stale Zustand state
+  const { user: supabaseUser, isLoading } = useAuth();
+  // Keep Zustand for user display data (it's already synced by AuthProvider)
+  const { user: storeUser } = useAuthStore();
 
   useEffect(() => {
-    if (!user) {
-      // router.push('/auth');
+    // Bug 1 Fix: Re-enabled auth guard — redirect to /auth if no Supabase session
+    if (!isLoading && !supabaseUser) {
+      router.push('/auth');
     }
-  }, [user, router]);
+  }, [supabaseUser, isLoading, router]);
+
+  // Bug 3 Fix: Proper sign-out that clears BOTH Supabase session and local store
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      // AuthProvider's onAuthStateChange will auto-call logout() on the store
+    } catch (err) {
+      console.error('Sign out error:', err);
+    } finally {
+      router.push('/auth');
+    }
+  };
 
   const navItems = [
     { name: 'Chat', href: '/dashboard/chat', icon: MessageSquare, description: 'Fluid Thinking' },
     { name: 'Memory', href: '/dashboard/memory', icon: Database, description: 'Knowledge Base' },
   ];
+
+  // Show loading state while auth is being determined
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-12 w-12 bg-primary/20 rounded-full mb-4"></div>
+          <div className="text-muted-foreground text-sm font-medium">Loading workspace...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render dashboard if not authenticated (redirect will happen via useEffect)
+  if (!supabaseUser) {
+    return null;
+  }
 
   return (
     <div className="flex bg-background min-h-screen text-foreground overflow-hidden selection:bg-primary/20">
@@ -70,17 +106,24 @@ export default function DashboardLayout({
         </div>
 
         <div className="px-2 md:px-4 space-y-2">
-          <div className="p-3 rounded-xl flex items-center gap-3 text-muted-foreground hover:text-foreground cursor-pointer transition-colors hover:bg-muted/50">
-            <User className="w-5 h-5" />
+          <div className="p-3 rounded-xl flex items-center gap-3 text-muted-foreground transition-colors">
+            {supabaseUser?.user_metadata?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={supabaseUser.user_metadata.avatar_url}
+                alt="avatar"
+                className="w-5 h-5 rounded-full"
+              />
+            ) : (
+              <User className="w-5 h-5" />
+            )}
             <div className="hidden md:block truncate text-sm">
-              {user?.full_name || 'User Profile'}
+              {storeUser?.full_name || supabaseUser?.email || 'User Profile'}
             </div>
           </div>
-          <div 
-            onClick={() => {
-              logout();
-              router.push('/auth');
-            }}
+          {/* Bug 3 Fix: Logout now properly calls supabase.auth.signOut() */}
+          <div
+            onClick={handleLogout}
             className="p-3 rounded-xl flex items-center gap-3 text-red-500/70 hover:text-red-500 cursor-pointer transition-colors hover:bg-red-500/10"
           >
             <LogOut className="w-5 h-5" />

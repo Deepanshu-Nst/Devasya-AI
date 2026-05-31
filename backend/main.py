@@ -82,13 +82,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Build CORS origin list: merge defaults + env-configured origins + FRONTEND_URL
+_default_cors = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://devasya-ai.vercel.app",
+]
+_extra = settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else []
+if settings.FRONTEND_URL:
+    _extra = _extra + [settings.FRONTEND_URL]
+_cors_origins = list(set(_default_cors + _extra))
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://devasya-ai.vercel.app"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

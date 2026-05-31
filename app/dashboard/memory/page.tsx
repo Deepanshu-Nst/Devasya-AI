@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, X, UploadCloud, FileText, File, Trash2, Save, AlignLeft, ChevronRight, Check } from 'lucide-react';
+import { Plus, Search, X, UploadCloud, FileText, File, Trash2, Save, AlignLeft, ChevronRight, Check, AlertCircle } from 'lucide-react';
 import { memoryApi } from '@/lib/api-client';
 
 const MotionDiv = motion.div as any;
@@ -21,6 +21,8 @@ export default function MemoryMode() {
 
   // File Upload
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -33,6 +35,8 @@ export default function MemoryMode() {
       const res = await memoryApi.list(0, 100);
       if (res.status === 200) {
         setMemories((res.data as any)?.memories || []);
+      } else {
+        console.error('Failed to load memories:', res.error);
       }
     } catch (e) {
       console.error(e);
@@ -51,14 +55,15 @@ export default function MemoryMode() {
     setSelectedItem(newItem);
     setEditTitle('');
     setEditContent('');
+    setSaveError(null);
   };
 
   const handleSelect = (item: any) => {
     setSelectedItem(item);
+    setSaveError(null);
     if (item.isDocInfo) {
       setEditTitle(item.source);
-      // Try to concatenate chunk contents if it's a doc to view it?
-      setEditContent("Document content is split into chunks for processing. Note: Editing raw document chunks is currently limited.");
+      setEditContent('Document content is split into chunks for processing. Note: Editing raw document chunks is currently limited.');
     } else {
       setEditTitle(item.title || '');
       setEditContent(item.content || '');
@@ -70,32 +75,48 @@ export default function MemoryMode() {
     if (!editContent.trim()) return;
     setIsSaving(true);
     setSaveSuccess(false);
+    setSaveError(null);
 
     try {
       if (selectedItem.isNew) {
         const res = await memoryApi.add(editContent, editTitle || undefined);
-        if (res.status === 200) {
-          const newMem = res.data;
-          setMemories(prev => [newMem, ...prev]);
+        if (res.status === 200 && res.data) {
+          // Bug 7 Fix: Properly map the returned MemoryResponse object
+          const newMem = res.data as any;
+          // Clear the temp isNew item and add the real one from the server
+          setMemories(prev => {
+            const filtered = prev.filter(m => m.id !== selectedItem.id);
+            return [newMem, ...filtered];
+          });
+          // Update selected item to the real saved item
           setSelectedItem(newMem);
+          setSaveSuccess(true);
+          setTimeout(() => setSaveSuccess(false), 2000);
+        } else {
+          setSaveError(res.error || 'Failed to save memory. Please try again.');
         }
       } else if (!selectedItem.isDocInfo) {
         const res = await memoryApi.update(selectedItem.id, editContent, editTitle || undefined);
-        if (res.status === 200) {
-          setMemories(prev => prev.map(m => m.id === selectedItem.id ? res.data : m));
+        if (res.status === 200 && res.data) {
+          const updated = res.data as any;
+          setMemories(prev => prev.map(m => m.id === selectedItem.id ? updated : m));
+          setSelectedItem(updated);
+          setSaveSuccess(true);
+          setTimeout(() => setSaveSuccess(false), 2000);
+        } else {
+          setSaveError(res.error || 'Failed to update memory. Please try again.');
         }
       }
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setSaveError(e?.message || 'An unexpected error occurred.');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDeleteItem = async (item: any) => {
-    const confirmed = window.confirm("Are you sure you want to delete this?");
+    const confirmed = window.confirm('Are you sure you want to delete this?');
     if (!confirmed) return;
     
     try {
@@ -114,19 +135,23 @@ export default function MemoryMode() {
     }
   };
 
+  // Bug 6 Fix: Show proper inline error instead of alert() when upload fails
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setIsUploading(true);
+      setUploadError(null);
       try {
         const res = await memoryApi.upload(file);
         if (res.status === 200) {
           await loadMemories();
         } else {
-          alert('Failed to upload document');
+          // Show the actual error from the server
+          const errDetail = (res.data as any)?.detail || res.error || 'Upload failed — check server logs.';
+          setUploadError(errDetail);
         }
-      } catch (err) {
-        alert('Upload completely failed.');
+      } catch (err: any) {
+        setUploadError(err?.message || 'Network error during upload. Try again.');
       } finally {
         setIsUploading(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -203,11 +228,23 @@ export default function MemoryMode() {
           </button>
           
           <div 
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 p-1.5 rounded-md transition-colors cursor-pointer mb-4"
+            onClick={() => {
+              setUploadError(null);
+              fileInputRef.current?.click();
+            }}
+            className="w-full flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 p-1.5 rounded-md transition-colors cursor-pointer mb-2"
           >
             {isUploading ? <span className="animate-pulse w-full text-left">Uploading...</span> : <><UploadCloud className="w-4 h-4" /> Upload Document</>}
           </div>
+
+          {/* Bug 6 Fix: Inline upload error instead of alert() */}
+          {uploadError && (
+            <div className="flex items-start gap-2 bg-destructive/10 border border-destructive/20 text-destructive text-xs px-2 py-2 rounded-md mb-2">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>{uploadError}</span>
+              <button onClick={() => setUploadError(null)} className="ml-auto opacity-60 hover:opacity-100">✕</button>
+            </div>
+          )}
           <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.doc,.docx,.txt" onChange={handleFileUpload} />
         </div>
 
@@ -249,6 +286,13 @@ export default function MemoryMode() {
                 </div>
                 
                 <div className="flex items-center gap-3">
+                  {/* Bug 7 Fix: Save error shown inline */}
+                  {saveError && (
+                    <div className="flex items-center gap-1.5 text-xs text-destructive bg-destructive/10 px-3 py-1.5 rounded-md border border-destructive/20">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      {saveError}
+                    </div>
+                  )}
                   {!selectedItem.isDocInfo && (
                      <button
                        onClick={handleSave}
@@ -280,6 +324,7 @@ export default function MemoryMode() {
                     onChange={(e) => {
                       setEditTitle(e.target.value);
                       setSaveSuccess(false);
+                      setSaveError(null);
                     }}
                     placeholder="Untitled"
                     className="text-4xl md:text-5xl font-bold bg-transparent outline-none placeholder:text-white/20 text-foreground w-full"
@@ -289,6 +334,7 @@ export default function MemoryMode() {
                     onChange={(e) => {
                       setEditContent(e.target.value);
                       setSaveSuccess(false);
+                      setSaveError(null);
                     }}
                     placeholder="Press space for AI, or start typing..."
                     className="flex-1 w-full text-base md:text-lg text-foreground/80 leading-relaxed bg-transparent outline-none resize-none placeholder:text-white/20 mt-4"

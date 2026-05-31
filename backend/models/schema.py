@@ -172,6 +172,17 @@ class QueryRequest(BaseModel):
 class QueryResponse(BaseModel):
     """Schema for query response."""
     response: str
+    # `insights` is an alias so the frontend can read either field
+    insights: Optional[str] = None
     session_id: uuid.UUID
     context_used: Optional[list] = None
     agent_logs: Optional[dict] = None
+
+    class Config:
+        populate_by_name = True
+
+    def __init__(self, **data):
+        # Auto-populate insights from response so both fields are available
+        if 'insights' not in data and 'response' in data:
+            data['insights'] = data['response']
+        super().__init__(**data)
