@@ -33,11 +33,18 @@ export default function KanbanView({ entityType = "task", statusOptions }: Kanba
   // Fetch tasks
   const { data: fetchRes, error, mutate } = useSWR(
     '/api/tasks',
-    () => tasksApi.query('').then(r => r.data)
+    () => tasksApi.query().then(r => r.data)
   );
 
   useEffect(() => {
-    if (fetchRes) setTasks(fetchRes as any[]);
+    if (fetchRes) {
+      if (Array.isArray(fetchRes)) {
+        setTasks(fetchRes);
+      } else {
+        console.error("fetchRes is not an array:", fetchRes);
+        setTasks([]);
+      }
+    }
   }, [fetchRes]);
 
   const handleCreateTask = async (status: string) => {
@@ -63,11 +70,11 @@ export default function KanbanView({ entityType = "task", statusOptions }: Kanba
         mutate();
       } else {
         // Rollback
-        setTasks(fetchRes as any[] || []);
+        setTasks(Array.isArray(fetchRes) ? fetchRes : []);
       }
     } catch (e) {
       console.error(e);
-      setTasks(fetchRes as any[] || []);
+      setTasks(Array.isArray(fetchRes) ? fetchRes : []);
     }
   };
 
@@ -81,7 +88,7 @@ export default function KanbanView({ entityType = "task", statusOptions }: Kanba
       mutate();
     } catch (e) {
       console.error(e);
-      setTasks(fetchRes as any[] || []); // rollback on failure
+      setTasks(Array.isArray(fetchRes) ? fetchRes : []); // rollback on failure
     }
   };
 

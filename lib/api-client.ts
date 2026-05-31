@@ -220,8 +220,13 @@ export const blocksApi = {
 };
 
 export const tasksApi = {
-  query: (workspaceId: string, status?: string) => 
-    apiClient.get(`/api/tasks?workspace_id=${workspaceId}${status ? `&status=${status}` : ''}`),
+  query: (workspaceId?: string, status?: string) => {
+    const params = new URLSearchParams();
+    if (workspaceId) params.append('workspace_id', workspaceId);
+    if (status) params.append('status', status);
+    const queryString = params.toString();
+    return apiClient.get(`/api/tasks${queryString ? `?${queryString}` : ''}`);
+  },
   create: (data: any) => apiClient.post('/api/tasks', data),
   update: (id: string, data: any) => apiClient.request('PATCH', `/api/tasks/${id}`, data),
   delete: (id: string) => apiClient.delete(`/api/tasks/${id}`),
