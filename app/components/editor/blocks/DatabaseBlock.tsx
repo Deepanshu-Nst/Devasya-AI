@@ -1,6 +1,6 @@
 import { createReactBlockSpec } from "@blocknote/react";
 import { defaultProps } from "@blocknote/core";
-import KanbanView from "./KanbanView";
+// import KanbanView from "./KanbanView";
 
 // We define the block schema using createReactBlockSpec
 export const DatabaseBlock = createReactBlockSpec(
@@ -32,10 +32,9 @@ export const DatabaseBlock = createReactBlockSpec(
             </div>
             
             {props.block.props.view_type === 'kanban' && (
-              <KanbanView 
-                entityType={props.block.props.entity_type} 
-                statusOptions={props.block.props.status_options} 
-              />
+              <div className="p-8 text-center text-white/50">
+                Kanban View is temporarily disabled to prevent a circular dependency crash.
+              </div>
             )}
             
             {props.block.props.view_type !== 'kanban' && (
