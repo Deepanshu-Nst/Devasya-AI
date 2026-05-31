@@ -207,10 +207,11 @@ def list_memories(
 
     except Exception as e:
         import traceback
-        logger.error(f"Error listing memories: {e}\n{traceback.format_exc()}")
+        full_trace = traceback.format_exc()
+        logger.error(f"Error listing memories: {e}\n{full_trace}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error listing memories: {str(e)}"
+            detail=f"Error listing memories: {str(e)}\n\nTRACEBACK:\n{full_trace}"
         )
 
 
