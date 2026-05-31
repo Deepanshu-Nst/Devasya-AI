@@ -147,7 +147,14 @@ def get_sessions(
         ).order_by(ChatSession.created_at.desc()).all()
         
         return {
-            "sessions": [{"id": s.id, "title": s.title, "created_at": s.created_at} for s in sessions]
+            "sessions": [
+                {
+                    "id": str(s.id),
+                    "title": s.title or "Conversation",
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                }
+                for s in sessions
+            ]
         }
     except Exception as e:
         logger.error(f"Error retrieving sessions: {e}")
@@ -226,7 +233,17 @@ def get_query_history(
             "total": total,
             "skip": skip,
             "limit": limit,
-            "interactions": messages # Frontend might need adaptation if it expects 'interactions' format
+            # Explicit serialization: UUID → str, datetime → ISO string
+            "interactions": [
+                {
+                    "id": str(m.id),
+                    "session_id": str(m.session_id),
+                    "role": m.role,
+                    "content": m.content,
+                    "created_at": m.created_at.isoformat() if m.created_at else None,
+                }
+                for m in messages
+            ],
         }
     except Exception as e:
         logger.error(f"Error retrieving query history: {e}")

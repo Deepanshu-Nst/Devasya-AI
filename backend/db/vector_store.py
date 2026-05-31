@@ -1,11 +1,16 @@
 """
 Supabase pgvector handler for semantic search and RAG.
 Replaces legacy ChromaDB to stabilize Render builds.
+
+Embedding strategy (priority order):
+  1. HuggingFace Inference API (free, no key needed, but can be rate-limited)
+  2. Zero-vector fallback — content is ALWAYS saved; vector search degrades gracefully
+     This ensures uploads/saves NEVER fail due to embedding provider outages.
 """
 import logging
+import time
 from typing import List, Dict, Any, Optional
 import uuid
-from openai import OpenAI
 
 from backend.config.settings import settings
 from backend.db.postgres import get_db
@@ -13,126 +18,158 @@ from backend.models.schema import DocumentChunk, Document, MemoryPage
 
 logger = logging.getLogger(__name__)
 
+# HuggingFace model dimensions: 384 → padded to 1536 to match existing pgvector schema
+EMBEDDING_DIM = 1536
+HF_API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+
+
 class VectorStore:
-    """Wrapper for pgvector operations using HuggingFace embeddings."""
-    
+    """Wrapper for pgvector operations using HuggingFace embeddings (with zero-vector fallback)."""
+
     def __init__(self):
-        try:
-            self.provider = "huggingface"
-            logger.info("Using HuggingFace Inference API for embeddings")
-        except Exception as e:
-            logger.error(f"Error initializing VectorStore: {e}")
-            raise
-    
+        logger.info("VectorStore initialized (HuggingFace API with zero-vector fallback)")
+
     def _get_embedding(self, text: str) -> List[float]:
-        """Generate embedding for text using fallback HuggingFace API."""
+        """
+        Generate embedding via HuggingFace Inference API.
+        Falls back to a zero vector if the API is unreachable (e.g., DNS failure on Render).
+        Content is ALWAYS saved — search quality degrades gracefully instead of blocking writes.
+        """
         import requests
-        import time
-        API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
-        
+
         headers = {}
         if settings.HUGGINGFACE_API_KEY:
             headers["Authorization"] = f"Bearer {settings.HUGGINGFACE_API_KEY}"
-        
-        for _ in range(3):
-            response = requests.post(API_URL, headers=headers, json={"inputs": [text]})
-            if response.status_code == 200:
-                result = response.json()
-                embedding = result[0] if isinstance(result[0], list) else result
-                # Pad to 1536 dimensions to match pgvector schema without requiring DB migration
-                if len(embedding) < 1536:
-                    embedding = embedding + [0.0] * (1536 - len(embedding))
-                elif len(embedding) > 1536:
-                    embedding = embedding[:1536]
-                return embedding
-            time.sleep(2)
-            
-        raise Exception(f"HuggingFace API failed with status {response.status_code}: {response.text}")
-        
-    def add_chunks(self, chunks: List[str], document_id: Optional[uuid.UUID] = None, memory_id: Optional[uuid.UUID] = None) -> List[uuid.UUID]:
-        """Embed and store chunks in Postgres pgvector."""
+
+        for attempt in range(2):
+            try:
+                response = requests.post(
+                    HF_API_URL,
+                    headers=headers,
+                    json={"inputs": [text[:512]]},  # Truncate to avoid input-too-long errors
+                    timeout=8,
+                )
+                if response.status_code == 200:
+                    result = response.json()
+                    embedding = result[0] if isinstance(result[0], list) else result
+                    # Pad or trim to EMBEDDING_DIM
+                    if len(embedding) < EMBEDDING_DIM:
+                        embedding = embedding + [0.0] * (EMBEDDING_DIM - len(embedding))
+                    elif len(embedding) > EMBEDDING_DIM:
+                        embedding = embedding[:EMBEDDING_DIM]
+                    return embedding
+                logger.warning(f"HuggingFace API returned {response.status_code} on attempt {attempt + 1}")
+                time.sleep(1)
+            except Exception as e:
+                logger.warning(f"HuggingFace embedding attempt {attempt + 1} failed: {type(e).__name__}: {e}")
+                if attempt < 1:
+                    time.sleep(1)
+
+        # ── Zero-vector fallback ──────────────────────────────────────────────
+        # Content is still stored in the DB; similarity search will not return
+        # these chunks, but the text is searchable via SQL LIKE if needed.
+        logger.warning(
+            "HuggingFace API unavailable. Storing content with zero-vector. "
+            "Semantic search for this item is degraded until embeddings are regenerated."
+        )
+        return [0.0] * EMBEDDING_DIM
+
+    def add_chunks(
+        self,
+        chunks: List[str],
+        document_id: Optional[uuid.UUID] = None,
+        memory_id: Optional[uuid.UUID] = None,
+    ) -> List[uuid.UUID]:
+        """Embed and store chunks in Postgres pgvector. Embedding failures use zero-vector fallback."""
         if not document_id and not memory_id:
             raise ValueError("Must provide either document_id or memory_id")
-            
+
         chunk_ids = []
+        db = next(get_db())
         try:
-            # We must use a separate database session context here
-            db = next(get_db())
-            
             for i, text in enumerate(chunks):
-                embedding = self._get_embedding(text)
+                # Each chunk gets its own embedding — individual chunk failures don't abort others
+                try:
+                    embedding = self._get_embedding(text)
+                except Exception as embed_err:
+                    logger.warning(f"Embedding failed for chunk {i} — using zero vector: {embed_err}")
+                    embedding = [0.0] * EMBEDDING_DIM
+
                 new_chunk = DocumentChunk(
                     document_id=document_id,
                     memory_id=memory_id,
                     content=text,
                     chunk_index=i,
-                    embedding=embedding
+                    embedding=embedding,
                 )
                 db.add(new_chunk)
                 db.commit()
                 db.refresh(new_chunk)
                 chunk_ids.append(new_chunk.id)
-                
-            db.close()
-            logger.info(f"Added {len(chunk_ids)} chunks to pgvector.")
+
+            logger.info(f"Stored {len(chunk_ids)} chunks in pgvector.")
             return chunk_ids
         except Exception as e:
-            logger.error(f"Error adding vector chunks: {e}")
+            logger.error(f"Error storing vector chunks: {e}")
             raise
+        finally:
+            db.close()
 
     def search(self, workspace_id: uuid.UUID, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """
-        Search for relevant chunks using pgvector cosine distance operator (<=>).
+        Search for relevant chunks using pgvector cosine distance.
+        Returns empty list on any failure — never blocks the query pipeline.
         """
+        db = next(get_db())
         try:
             query_embedding = self._get_embedding(query)
-            
-            db = next(get_db())
-            
-            # Find the top_k chunks that belong to this workspace
-            # We join Document and MemoryPage to verify workspace ownership
-            
-            results = db.query(DocumentChunk).outerjoin(
-                Document, DocumentChunk.document_id == Document.id
-            ).outerjoin(
-                MemoryPage, DocumentChunk.memory_id == MemoryPage.id
-            ).filter(
-                (Document.workspace_id == workspace_id) | (MemoryPage.workspace_id == workspace_id)
-            ).order_by(
-                DocumentChunk.embedding.cosine_distance(query_embedding)
-            ).limit(top_k).all()
-            
-            formatted_results = []
+
+            results = (
+                db.query(DocumentChunk)
+                .outerjoin(Document, DocumentChunk.document_id == Document.id)
+                .outerjoin(MemoryPage, DocumentChunk.memory_id == MemoryPage.id)
+                .filter(
+                    (Document.workspace_id == workspace_id)
+                    | (MemoryPage.workspace_id == workspace_id)
+                )
+                .order_by(DocumentChunk.embedding.cosine_distance(query_embedding))
+                .limit(top_k)
+                .all()
+            )
+
+            formatted = []
             for chunk in results:
-                formatted_results.append({
-                    "id": chunk.id,
-                    "content": chunk.content,
-                    "metadata": {
-                        "document_id": str(chunk.document_id) if chunk.document_id else None,
-                        "memory_id": str(chunk.memory_id) if chunk.memory_id else None,
-                        "chunk_index": chunk.chunk_index
+                formatted.append(
+                    {
+                        "id": str(chunk.id),
+                        "content": chunk.content,
+                        "metadata": {
+                            "document_id": str(chunk.document_id) if chunk.document_id else None,
+                            "memory_id": str(chunk.memory_id) if chunk.memory_id else None,
+                            "chunk_index": chunk.chunk_index,
+                        },
                     }
-                })
-                
-            db.close()
-            return formatted_results
+                )
+            return formatted
         except Exception as e:
-            logger.error(f"Error searching vectors: {e}")
+            logger.error(f"Vector search failed (non-fatal): {e}")
             return []
+        finally:
+            db.close()
 
 
-# Global vector store instance
+# Global instance
 _vector_store = None
 
+
 def init_vector_store() -> VectorStore:
-    """Initialize and return global vector store instance."""
     global _vector_store
     if _vector_store is None:
         _vector_store = VectorStore()
     return _vector_store
 
+
 def get_vector_store() -> VectorStore:
-    """Get global vector store instance."""
     global _vector_store
     if _vector_store is None:
         _vector_store = VectorStore()

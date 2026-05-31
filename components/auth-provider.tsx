@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
 import { useRouter, usePathname } from 'next/navigation';
@@ -22,6 +22,8 @@ export const useAuth = () => useContext(AuthContext);
 
 // Routes that don't require authentication
 const PUBLIC_ROUTES = ['/', '/auth'];
+const isPublicRoute = (path: string) =>
+  PUBLIC_ROUTES.some((r) => path === r || path.startsWith('/auth'));
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -29,39 +31,43 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const initialized = useRef(false);
 
-  // Zustand store actions — kept in sync with Supabase
   const { setAuth, logout } = useAuthStore();
 
-  const syncSession = (session: Session | null) => {
-    setSession(session);
-    setUser(session?.user ?? null);
+  const syncSession = (newSession: Session | null) => {
+    setSession(newSession);
+    setUser(newSession?.user ?? null);
 
-    if (session?.user) {
-      // Sync into Zustand store so dashboard layout & home page read consistent auth state
+    if (newSession?.user) {
       setAuth(
         {
-          id: session.user.id,
-          email: session.user.email ?? '',
+          id: newSession.user.id,
+          email: newSession.user.email ?? '',
           full_name:
-            session.user.user_metadata?.full_name ||
-            session.user.user_metadata?.name ||
-            session.user.email?.split('@')[0] ||
+            newSession.user.user_metadata?.full_name ||
+            newSession.user.user_metadata?.name ||
+            newSession.user.email?.split('@')[0] ||
             'User',
           avatar_url:
-            session.user.user_metadata?.avatar_url ||
-            session.user.user_metadata?.picture ||
+            newSession.user.user_metadata?.avatar_url ||
+            newSession.user.user_metadata?.picture ||
             null,
         },
-        session.access_token
+        newSession.access_token
       );
     } else {
-      // Clear Zustand store on sign-out
       logout();
     }
   };
 
+  // ── ONE-TIME initialization on mount ────────────────────────────────────
+  // Do NOT depend on `pathname` here — that caused initAuth() to re-run on
+  // every navigation, creating race conditions and stale-state redirects.
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
     const initAuth = async () => {
       try {
         const {
@@ -69,16 +75,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           error,
         } = await supabase.auth.getSession();
         if (error) throw error;
-
         syncSession(session);
-
-        // Redirect unauthenticated users away from protected routes
-        const isPublic = PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith('/auth'));
-        if (!session && !isPublic) {
-          router.push('/auth');
-        }
       } catch (error) {
-        console.error('Error fetching session:', error);
+        console.error('Auth init error:', error);
         logout();
       } finally {
         setIsLoading(false);
@@ -87,25 +86,32 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
     initAuth();
 
+    // Real-time auth state listener — fires on login / logout / token refresh
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      syncSession(session);
-
-      const isPublic = PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith('/auth'));
-
-      if (!session && !isPublic) {
-        router.push('/auth');
-      } else if (session && pathname === '/auth') {
-        router.push('/dashboard/chat');
-      }
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      syncSession(newSession);
     });
 
     return () => {
       subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, []);
+
+  // ── Route protection — runs whenever pathname or auth state changes ──────
+  // This is a SEPARATE effect so it doesn't trigger re-initialization.
+  useEffect(() => {
+    if (isLoading) return; // Wait until we know auth state
+
+    if (!session && !isPublicRoute(pathname)) {
+      // Protected route accessed without session → redirect to sign-in
+      router.push('/auth');
+    } else if (session && pathname === '/auth') {
+      // Already signed in and landed on sign-in page → redirect to app
+      router.push('/dashboard/chat');
+    }
+  }, [session, isLoading, pathname, router]);
 
   if (isLoading) {
     return (

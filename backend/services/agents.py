@@ -392,7 +392,7 @@ class MultiAgentOrchestrator:
         """Full async pipeline execution."""
         execution_log = {
             "timestamp": datetime.utcnow().isoformat(),
-            "user_id": user_id,
+            "user_id": str(user_id),  # str to ensure JSON-serializable
             "query": user_query,
             "steps": [],
         }

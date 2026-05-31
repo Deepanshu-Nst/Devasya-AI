@@ -61,30 +61,31 @@ def add_memory(
         db.commit()
         db.refresh(new_memory)
         
-        # Add to vector store (pgvector)
-        # For small memories, we can just embed the whole content as one chunk.
-        # For larger memories, we might want to chunk it.
-        from backend.services.document_parser import chunk_text
-        chunks = chunk_text(memory_data.content, chunk_size=1000, overlap=100)
+        # Embed and index the content (best-effort — never fails the whole request)
+        try:
+            from backend.services.document_parser import chunk_text
+            chunks = chunk_text(memory_data.content, chunk_size=1000, overlap=100)
+            vector_store = get_vector_store()
+            vector_store.add_chunks(
+                chunks=chunks if chunks else [memory_data.content],
+                memory_id=new_memory.id
+            )
+            logger.info(f"MemoryPage {new_memory.id} embedded and stored")
+        except Exception as embed_err:
+            logger.warning(
+                f"Embedding failed for memory {new_memory.id} (content saved, search degraded): {embed_err}"
+            )
         
-        vector_store = get_vector_store()
-        vector_store.add_chunks(
-            chunks=chunks if chunks else [memory_data.content],
-            memory_id=new_memory.id
-        )
-        
-        logger.info(f"MemoryPage {new_memory.id} added for user {user_id}")
         return new_memory
     
     except Exception as e:
         db.rollback()
         import traceback
         tb = traceback.format_exc()
-        print(f"Error adding memory: {e}\n{tb}")
         logger.error(f"Error adding memory: {e}\n{tb}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error adding memory: {str(e)}\n\nTraceback:\n{tb}"
+            detail=f"Error adding memory: {str(e)}"
         )
 
 
@@ -190,20 +191,22 @@ def update_memory(
         db.commit()
         db.refresh(memory)
         
-        # In a real app, we would delete the old DocumentChunk records via SQL.
-        # Cascade delete is not set up on update, so we manually delete old chunks:
-        from backend.models.schema import DocumentChunk
-        db.query(DocumentChunk).filter(DocumentChunk.memory_id == memory.id).delete()
-        db.commit()
+        # Re-embed (best-effort — never fails the update request)
+        try:
+            from backend.models.schema import DocumentChunk
+            db.query(DocumentChunk).filter(DocumentChunk.memory_id == memory.id).delete()
+            db.commit()
+                
+            from backend.services.document_parser import chunk_text
+            chunks = chunk_text(memory_update.content, chunk_size=1000, overlap=100)
             
-        from backend.services.document_parser import chunk_text
-        chunks = chunk_text(memory_update.content, chunk_size=1000, overlap=100)
-        
-        vector_store = get_vector_store()
-        vector_store.add_chunks(
-            chunks=chunks if chunks else [memory_update.content],
-            memory_id=memory.id
-        )
+            vector_store = get_vector_store()
+            vector_store.add_chunks(
+                chunks=chunks if chunks else [memory_update.content],
+                memory_id=memory.id
+            )
+        except Exception as embed_err:
+            logger.warning(f"Re-embedding failed for memory {memory.id} (content updated, search degraded): {embed_err}")
         
         return memory
     except Exception as e:
@@ -304,7 +307,7 @@ async def upload_document(
         if not chunks:
             raise ValueError("File content too short or failed to chunk")
             
-        # 3. Save Document record
+        # 3. Save Document record first (always succeeds independently of embedding)
         document = Document(
             workspace_id=workspace_id,
             uploaded_by=user_id,
@@ -312,20 +315,30 @@ async def upload_document(
             file_url=file_url,
             file_type=file.content_type,
             file_size=len(file_content),
-            embedding_status="completed"
+            embedding_status="pending"
         )
         db.add(document)
         db.commit()
         db.refresh(document)
             
-        # 4. Generate and save Embeddings to pgvector
-        vector_store = get_vector_store()
-        vector_store.add_chunks(
-            chunks=chunks,
-            document_id=document.id
-        )
+        # 4. Generate and save Embeddings (best-effort — upload ALWAYS succeeds)
+        try:
+            vector_store = get_vector_store()
+            vector_store.add_chunks(
+                chunks=chunks,
+                document_id=document.id
+            )
+            # Mark embedding complete
+            document.embedding_status = "completed"
+            db.commit()
+            logger.info(f"Processed {file.filename} into {len(chunks)} chunks for user {user_id}")
+        except Exception as embed_err:
+            logger.warning(
+                f"Embedding failed for document {document.id} (file saved, search degraded): {embed_err}"
+            )
+            document.embedding_status = "failed"
+            db.commit()
             
-        logger.info(f"Processed {file.filename} into {len(chunks)} chunks for user {user_id}")
         return {"message": "Document uploaded and processed successfully", "document_id": str(document.id)}
     
     except Exception as e:
