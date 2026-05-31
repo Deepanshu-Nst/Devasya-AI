@@ -6,7 +6,7 @@ import { useAuth } from '@/components/auth-provider';
 import { useAuthStore } from '@/lib/auth-store';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Database, Sparkles, LogOut, User } from 'lucide-react';
+import { MessageSquare, Database, Sparkles, LogOut, User, CheckSquare } from 'lucide-react';
 import Link from 'next/link';
 
 const MotionDiv = motion.div as any;
@@ -49,6 +49,7 @@ export default function DashboardLayout({
   const navItems = [
     { name: 'Chat', href: '/dashboard/chat', icon: MessageSquare, description: 'Fluid Thinking' },
     { name: 'Memory', href: '/dashboard/memory', icon: Database, description: 'Knowledge Base' },
+    { name: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare, description: 'Structured Tasks' },
   ];
 
   // Show loading state while auth is being determined
