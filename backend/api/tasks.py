@@ -126,11 +126,15 @@ def create_task(
     # 1. Create canonical block
     props = task_data.properties or {}
     props['title'] = task_data.title
-    
+    import json
+    content_str = None
+    if task_data.content is not None:
+        content_str = json.dumps(task_data.content) if not isinstance(task_data.content, str) else task_data.content
+
     new_block = Block(
         workspace_id=workspace_id,
         type="task",
-        content=task_data.content,
+        content=content_str,
         properties=props,
         created_by=current_user.id
     )
