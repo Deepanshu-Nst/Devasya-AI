@@ -1,15 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createReactBlockSpec } from "@blocknote/react";
-import { defaultProps } from "@blocknote/core";
 import { aiApi, tasksApi } from '@/lib/api-client';
-import { Sparkles, Loader2, X, Check, RefreshCw } from 'lucide-react';
+import { Sparkles, Loader2, X, RefreshCw } from 'lucide-react';
 
 export const AiBlock = createReactBlockSpec(
   {
     type: "ai",
     propSchema: {
-      textAlignment: defaultProps.textAlignment,
-      textColor: defaultProps.textColor,
       action: {
         default: "custom",
       },
