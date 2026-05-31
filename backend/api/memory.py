@@ -325,26 +325,39 @@ def delete_memory(
         for row in db.query(Workspace.id).filter(Workspace.owner_id == user_id).all()
     ]
 
-    memory = db.query(Block).filter(
+    # Check if it's a Block page
+    block = db.query(Block).filter(
         Block.id == mem_uuid,
         Block.workspace_id.in_(workspace_ids),
         Block.type == 'page'
     ).first()
 
-    if not memory:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory not found")
+    if block:
+        try:
+            db.delete(block)
+            db.commit()
+            return {"message": "Page deleted successfully"}
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
 
-    try:
-        db.delete(memory)
-        db.commit()
-        return {"message": "Memory deleted successfully"}
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error deleting memory: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting memory: {str(e)}"
-        )
+    # Check if it's a Document
+    document = db.query(Document).filter(
+        Document.id == mem_uuid,
+        Document.workspace_id.in_(workspace_ids)
+    ).first()
+
+    if document:
+        try:
+            # We don't delete from Supabase storage here yet, just DB
+            db.delete(document)
+            db.commit()
+            return {"message": "Document deleted successfully"}
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory or Document not found")
 
 
 @router.post("/upload")
