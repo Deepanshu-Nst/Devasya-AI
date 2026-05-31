@@ -8,27 +8,38 @@ const MotionDiv = motion.div as any;
 
 export default function GlobalTasksPage() {
   return (
-    <div className="flex-1 overflow-auto h-full p-4 sm:p-8 flex flex-col bg-black">
-      <div className="max-w-6xl w-full mx-auto flex-1 flex flex-col">
+    <div
+      className="flex flex-col h-full overflow-hidden"
+      style={{ background: 'oklch(0.115 0 0)' }}
+    >
+      {/* Page header */}
+      <div
+        className="shrink-0 px-8 py-5 flex items-center justify-between"
+        style={{ borderBottom: '1px solid oklch(0.20 0 0)' }}
+      >
         <MotionDiv
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-8"
+          transition={{ duration: 0.2 }}
         >
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Tasks</h1>
-            <p className="text-white/50 text-sm">Manage all your workspace tasks across pages</p>
-          </div>
+          <h1
+            className="text-[18px] font-semibold tracking-tight"
+            style={{ color: 'oklch(0.88 0 0)' }}
+          >
+            Tasks
+          </h1>
+          <p className="text-[13px] mt-0.5" style={{ color: 'oklch(0.44 0 0)' }}>
+            Drag cards between columns to update status
+          </p>
         </MotionDiv>
+      </div>
 
-        <div className="flex-1 flex flex-col bg-white/5 border border-white/10 rounded-2xl p-6 shadow-2xl overflow-hidden">
-          {/* Note: In a production app, the status options could be configurable per workspace. 
-              Here we default to standard options. */}
-          <KanbanView 
-            entityType="task" 
-            statusOptions="Todo, In Progress, Done, Blocked" 
-          />
-        </div>
+      {/* Board */}
+      <div className="flex-1 overflow-hidden p-6">
+        <KanbanView
+          entityType="task"
+          statusOptions="Todo, In Progress, Done, Blocked"
+        />
       </div>
     </div>
   );
