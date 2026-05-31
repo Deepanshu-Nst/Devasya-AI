@@ -275,10 +275,10 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
                       onClick={() => openTask(task)}
                       className="group p-4 cursor-pointer transition-colors duration-150 relative rounded-xl"
                       style={{ background: 'oklch(0.13 0 0)' }}
-                      onMouseEnter={e => {
+                      onMouseEnter={(e: React.MouseEvent) => {
                         (e.currentTarget as HTMLElement).style.background = 'oklch(0.14 0 0)';
                       }}
-                      onMouseLeave={e => {
+                      onMouseLeave={(e: React.MouseEvent) => {
                         (e.currentTarget as HTMLElement).style.background = 'oklch(0.13 0 0)';
                       }}
                     >

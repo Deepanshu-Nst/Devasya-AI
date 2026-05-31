@@ -67,7 +67,7 @@ export default function BlockEditor({ initialContent, onChange, editable = true 
   return (
     <div className="w-full min-h-[500px]">
       <BlockNoteView
-        editor={editor}
+        editor={editor as any}
         theme={theme === 'dark' ? 'dark' : 'light'}
         editable={editable}
         slashMenu={false}
@@ -79,7 +79,7 @@ export default function BlockEditor({ initialContent, onChange, editable = true 
         <SuggestionMenuController
           triggerCharacter={"/"}
           getItems={async (query) =>
-            filterSuggestionItems(getCustomSlashMenuItems(editor), query)
+            filterSuggestionItems(getCustomSlashMenuItems(editor as any), query)
           }
         />
       </BlockNoteView>

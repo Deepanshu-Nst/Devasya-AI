@@ -60,7 +60,7 @@ export default function LightweightEditor({ initialContent, onChange, editable =
   return (
     <div className="w-full h-full min-h-[300px]">
       <BlockNoteView
-        editor={editor}
+        editor={editor as any}
         theme={theme === 'dark' ? 'dark' : 'light'}
         editable={editable}
         slashMenu={false}
