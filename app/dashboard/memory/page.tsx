@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, X, UploadCloud, FileText, File, Trash2, Save, AlignLeft, ChevronRight, Check, AlertCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { memoryApi } from '@/lib/api-client';
+import { memoryApi, blocksApi } from '@/lib/api-client';
 
 const BlockEditor = dynamic(() => import('@/app/components/editor/BlockEditor'), {
   ssr: false,
@@ -65,7 +65,7 @@ export default function MemoryMode() {
     setSaveError(null);
   };
 
-  const handleSelect = (item: any) => {
+  const handleSelect = async (item: any) => {
     setSelectedItem(item);
     setSaveError(null);
     if (item.isDocInfo) {
@@ -76,20 +76,55 @@ export default function MemoryMode() {
           content: "Document content is split into chunks for processing. Note: Editing raw document chunks is currently limited."
         }
       ]);
+      setSaveSuccess(false);
     } else {
       setEditTitle(item.title || '');
       
-      // Try to parse existing content as JSON blocks. If it fails, treat as plain text.
-      let blocks = [];
       try {
-        blocks = JSON.parse(item.content);
-        if (!Array.isArray(blocks)) throw new Error('Not an array');
-      } catch (e) {
-        blocks = item.content ? [{ type: "paragraph", content: item.content }] : [];
+        // Fetch children blocks for this page
+        const res = await blocksApi.getChildren(item.id);
+        if (res.status === 200 && res.data) {
+          const children = res.data as any[];
+          
+          if (children.length > 0) {
+            // Map flat children back to BlockNote format
+            const mappedBlocks = children.map(b => ({
+              id: b.id,
+              type: b.type,
+              props: b.properties,
+              content: b.content ? JSON.parse(b.content) : undefined,
+              children: [] // We aren't fully supporting deep nesting loads yet in this basic flat mapping
+            }));
+            setEditContent(mappedBlocks);
+          } else {
+            // Handle legacy pages that haven't been auto-migrated or are empty
+            let blocks = [];
+            try {
+              blocks = JSON.parse(item.content);
+              if (!Array.isArray(blocks)) throw new Error('Not array');
+            } catch (e) {
+              blocks = item.content ? [{ type: "paragraph", content: item.content }] : [];
+            }
+            setEditContent(blocks);
+          }
+        } else {
+          throw new Error('Failed to fetch children');
+        }
+      } catch (err) {
+        console.error("Error loading blocks:", err);
+        // Fallback to legacy content parsing
+        let blocks = [];
+        try {
+          blocks = JSON.parse(item.content);
+          if (!Array.isArray(blocks)) throw new Error('Not array');
+        } catch (e) {
+          blocks = item.content ? [{ type: "paragraph", content: item.content }] : [];
+        }
+        setEditContent(blocks);
       }
-      setEditContent(blocks);
+      
+      setSaveSuccess(false);
     }
-    setSaveSuccess(false);
   };
 
   const handleSave = async () => {
@@ -100,36 +135,75 @@ export default function MemoryMode() {
     }
     
     // Convert blocks to JSON string for backend
-    const contentString = JSON.stringify(editContent);
     setIsSaving(true);
     setSaveSuccess(false);
     setSaveError(null);
 
     try {
+      let pageId = selectedItem.id;
+      
       if (selectedItem.isNew) {
-        const res = await memoryApi.add(contentString, editTitle || undefined);
-        if (res.status === 200 && res.data) {
-          const newMem = res.data as any;
-          // Reload full list from DB to confirm persistence
-          await loadMemories();
-          // Find the newly created item in the fresh list (by id)
-          setSelectedItem(newMem);
-          setSaveSuccess(true);
-          setTimeout(() => setSaveSuccess(false), 2500);
+        // Create the page block first
+        const pageRes = await blocksApi.create({
+          type: "page",
+          properties: { title: editTitle || 'Untitled Page', visibility: 'private' }
+        });
+        
+        if (pageRes.status === 200 && pageRes.data) {
+          const newPage = pageRes.data as any;
+          pageId = newPage.id;
         } else {
-          setSaveError(res.error || 'Failed to save. Please try again.');
+          setSaveError(pageRes.error || 'Failed to create page. Please try again.');
+          setIsSaving(false);
+          return;
         }
       } else if (!selectedItem.isDocInfo) {
-        const res = await memoryApi.update(selectedItem.id, contentString, editTitle || undefined);
-        if (res.status === 200 && res.data) {
-          const updated = res.data as any;
-          // Reload full list from DB to confirm persistence
+        // Update the existing page block title
+        await blocksApi.update(pageId, {
+          properties: { title: editTitle || 'Untitled Page' }
+        });
+      }
+
+      if (!selectedItem.isDocInfo) {
+        // Flatten blocks for batch update
+        const operations: any[] = [];
+        
+        const flattenBlocks = (blocks: any[], parentId: string, positionOffset = 0) => {
+          blocks.forEach((b, index) => {
+            operations.push({
+              op: "update", // upsert
+              block: {
+                id: b.id,
+                type: b.type,
+                parent_id: parentId,
+                position: positionOffset + index,
+                content: b.content ? JSON.stringify(b.content) : null,
+                properties: b.props || {}
+              }
+            });
+            if (b.children && b.children.length > 0) {
+              flattenBlocks(b.children, b.id, positionOffset + index * 1000);
+            }
+          });
+        };
+        
+        flattenBlocks(editContent, pageId);
+        
+        const batchRes = await blocksApi.batch(operations);
+        
+        if (batchRes.status === 200) {
           await loadMemories();
-          setSelectedItem(updated);
+          // Find the newly created/updated item in the fresh list (by id)
+          const updatedListRes = await memoryApi.list(0, 100);
+          if (updatedListRes.status === 200) {
+            const list = (updatedListRes.data as any)?.memories || [];
+            const freshItem = list.find((m: any) => m.id === pageId);
+            if (freshItem) setSelectedItem(freshItem);
+          }
           setSaveSuccess(true);
           setTimeout(() => setSaveSuccess(false), 2500);
         } else {
-          setSaveError(res.error || 'Failed to update. Please try again.');
+          setSaveError(batchRes.error || 'Failed to save blocks.');
         }
       }
     } catch (e: any) {

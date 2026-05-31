@@ -12,7 +12,7 @@ from supabase import create_client, Client
 from backend.config.settings import settings
 from backend.db.postgres import get_db, SessionLocal
 from backend.db.vector_store import get_vector_store
-from backend.models.schema import MemoryPage, Document, Profile, Workspace, MemoryCreate, MemoryResponse, DocumentChunk
+from backend.models.schema import MemoryPage, Document, Profile, Workspace, MemoryCreate, MemoryResponse, DocumentChunk, Block
 from backend.api.auth import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,18 @@ def _serialize_memory(m: MemoryPage) -> dict:
         "content": m.content,
         "visibility": m.visibility or "private",
         "created_at": m.created_at.isoformat() if m.created_at else None,
+        "meta_data": None,
+    }
+
+def _serialize_block_page(b: Block) -> dict:
+    """Convert a Block (type='page') ORM object to match MemoryPage dict shape."""
+    return {
+        "id": str(b.id),
+        "workspace_id": str(b.workspace_id),
+        "title": b.properties.get("title") if b.properties else "Untitled",
+        "content": b.content,
+        "visibility": b.properties.get("visibility") if b.properties else "private",
+        "created_at": b.created_at.isoformat() if b.created_at else None,
         "meta_data": None,
     }
 
@@ -159,13 +171,15 @@ def list_memories(
         if not workspace_ids:
             return {"total": 0, "skip": skip, "limit": limit, "memories": []}
 
-        # ── 1. Memory Pages (text notes) ──────────────────────────────────────
-        memory_pages = db.query(MemoryPage).filter(
-            MemoryPage.workspace_id.in_(workspace_ids)
-        ).order_by(MemoryPage.created_at.desc()).all()
+        # ── 1. Memory Pages (Now Blocks) ──────────────────────────────────────
+        # We query blocks of type 'page' instead of the legacy memory_pages
+        block_pages = db.query(Block).filter(
+            Block.workspace_id.in_(workspace_ids),
+            Block.type == 'page'
+        ).order_by(Block.created_at.desc()).all()
 
-        # Serialize INSIDE the session (while attributes are accessible)
-        items = [_serialize_memory(m) for m in memory_pages]
+        # Serialize INSIDE the session
+        items = [_serialize_block_page(b) for b in block_pages]
 
         # ── 2. Uploaded Documents ─────────────────────────────────────────────
         # Documents live in the `documents` table — they would be invisible to
@@ -311,9 +325,10 @@ def delete_memory(
         for row in db.query(Workspace.id).filter(Workspace.owner_id == user_id).all()
     ]
 
-    memory = db.query(MemoryPage).filter(
-        MemoryPage.id == mem_uuid,
-        MemoryPage.workspace_id.in_(workspace_ids)
+    memory = db.query(Block).filter(
+        Block.id == mem_uuid,
+        Block.workspace_id.in_(workspace_ids),
+        Block.type == 'page'
     ).first()
 
     if not memory:

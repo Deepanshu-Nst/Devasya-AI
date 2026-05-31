@@ -61,9 +61,8 @@ class MemoryPage(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    workspace = relationship("Workspace", back_populates="memory_pages")
-    creator = relationship("Profile", back_populates="memory_pages")
-    chunks = relationship("DocumentChunk", back_populates="memory", cascade="all, delete-orphan")
+    # Chunks are now on Block, but we can leave this empty or removed since memory pages are deprecated
+    # chunks = relationship("DocumentChunk", back_populates="memory", cascade="all, delete-orphan")
 
 
 class Block(Base):
@@ -84,6 +83,7 @@ class Block(Base):
     # Relationships
     workspace = relationship("Workspace", back_populates="blocks")
     creator = relationship("Profile", back_populates="blocks")
+    chunks = relationship("DocumentChunk", back_populates="block", cascade="all, delete-orphan")
     
     # Self-referential relationship for nested blocks
     children = relationship("Block", backref=backref('parent', remote_side=[id]), cascade="all, delete-orphan")
@@ -115,7 +115,7 @@ class DocumentChunk(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=True, index=True)
-    memory_id = Column(UUID(as_uuid=True), ForeignKey("memory_pages.id", ondelete="CASCADE"), nullable=True, index=True)
+    block_id = Column(UUID(as_uuid=True), ForeignKey("blocks.id", ondelete="CASCADE"), nullable=True, index=True)
     content = Column(Text, nullable=False)
     chunk_index = Column(Integer, nullable=True)
     embedding = Column(Vector(1536)) # OpenAI embedding dimension
@@ -123,7 +123,7 @@ class DocumentChunk(Base):
     
     # Relationships
     document = relationship("Document", back_populates="chunks")
-    memory = relationship("MemoryPage", back_populates="chunks")
+    block = relationship("Block", back_populates="chunks")
 
 
 class ChatSession(Base):

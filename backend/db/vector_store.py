@@ -14,7 +14,7 @@ import uuid
 
 from backend.config.settings import settings
 from backend.db.postgres import get_db
-from backend.models.schema import DocumentChunk, Document, MemoryPage
+from backend.models.schema import DocumentChunk, Document, Block
 
 logger = logging.getLogger(__name__)
 
@@ -78,11 +78,11 @@ class VectorStore:
         self,
         chunks: List[str],
         document_id: Optional[uuid.UUID] = None,
-        memory_id: Optional[uuid.UUID] = None,
+        block_id: Optional[uuid.UUID] = None,
     ) -> List[uuid.UUID]:
         """Embed and store chunks in Postgres pgvector. Embedding failures use zero-vector fallback."""
-        if not document_id and not memory_id:
-            raise ValueError("Must provide either document_id or memory_id")
+        if not document_id and not block_id:
+            raise ValueError("Must provide either document_id or block_id")
 
         chunk_ids = []
         db = next(get_db())
@@ -97,7 +97,7 @@ class VectorStore:
 
                 new_chunk = DocumentChunk(
                     document_id=document_id,
-                    memory_id=memory_id,
+                    block_id=block_id,
                     content=text,
                     chunk_index=i,
                     embedding=embedding,
@@ -127,10 +127,10 @@ class VectorStore:
             results = (
                 db.query(DocumentChunk)
                 .outerjoin(Document, DocumentChunk.document_id == Document.id)
-                .outerjoin(MemoryPage, DocumentChunk.memory_id == MemoryPage.id)
+                .outerjoin(Block, DocumentChunk.block_id == Block.id)
                 .filter(
                     (Document.workspace_id == workspace_id)
-                    | (MemoryPage.workspace_id == workspace_id)
+                    | (Block.workspace_id == workspace_id)
                 )
                 .order_by(DocumentChunk.embedding.cosine_distance(query_embedding))
                 .limit(top_k)
@@ -145,7 +145,7 @@ class VectorStore:
                         "content": chunk.content,
                         "metadata": {
                             "document_id": str(chunk.document_id) if chunk.document_id else None,
-                            "memory_id": str(chunk.memory_id) if chunk.memory_id else None,
+                            "block_id": str(chunk.block_id) if chunk.block_id else None,
                             "chunk_index": chunk.chunk_index,
                         },
                     }

@@ -207,6 +207,17 @@ export const memoryApi = {
   delete: (id: string) => apiClient.delete(`/api/memory/${id}`),
 };
 
+// Blocks endpoints
+export const blocksApi = {
+  getPages: () => apiClient.get('/api/blocks/pages'),
+  getBlock: (id: string) => apiClient.get(`/api/blocks/${id}`),
+  getChildren: (id: string) => apiClient.get(`/api/blocks/${id}/children`),
+  create: (data: any) => apiClient.post('/api/blocks/', data),
+  update: (id: string, data: any) => apiClient.put(`/api/blocks/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/api/blocks/${id}`),
+  batch: (operations: any[]) => apiClient.post('/api/blocks/batch', operations)
+};
+
 // Query endpoints
 export const queryApi = {
   ask: (query: string, useMemory: boolean = true, sessionId?: string) =>

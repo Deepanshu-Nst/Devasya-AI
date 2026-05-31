@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
@@ -12,6 +12,45 @@ from backend.api.memory import get_user_workspace
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/blocks", tags=["blocks"])
+
+def _embed_block_background(block_id: uuid.UUID, content: str):
+    """Background task to generate embeddings for a block."""
+    try:
+        from backend.db.vector_store import get_vector_store
+        vector_store = get_vector_store()
+        
+        # We assume content is either plain text or a JSON array of inline text.
+        # Let's extract raw text if it's JSON.
+        import json
+        text_to_embed = content
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, list):
+                # Simple extraction of text fields from inline content
+                text_to_embed = " ".join([item.get("text", "") for item in parsed if isinstance(item, dict) and "text" in item])
+        except Exception:
+            pass
+            
+        if not text_to_embed.strip():
+            return
+            
+        # Re-embed: we delete old chunks for this block first
+        from backend.db.postgres import SessionLocal
+        from backend.models.schema import DocumentChunk
+        db = SessionLocal()
+        try:
+            db.query(DocumentChunk).filter(DocumentChunk.block_id == block_id).delete()
+            db.commit()
+        finally:
+            db.close()
+            
+        vector_store.add_chunks(
+            chunks=[text_to_embed],
+            block_id=block_id
+        )
+        logger.info(f"Background embedding completed for block {block_id}")
+    except Exception as embed_err:
+        logger.warning(f"Background embedding failed for block {block_id}: {embed_err}")
 
 class BlockCreate(BaseModel):
     type: str
@@ -158,6 +197,7 @@ def delete_block(
 @router.post("/batch")
 def batch_update_blocks(
     operations: List[Dict[str, Any]],
+    background_tasks: BackgroundTasks,
     current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -208,4 +248,17 @@ def batch_update_blocks(
             ).delete()
             
     db.commit()
+    
+    # Trigger background embeddings for updated/inserted text blocks
+    for op in operations:
+        op_type = op.get("op")
+        block_data = op.get("block", {})
+        block_id = block_data.get("id")
+        content = block_data.get("content")
+        block_type = block_data.get("type", "")
+        
+        # Only embed meaningful text blocks
+        if (op_type == "insert" or op_type == "update") and content and block_type in ["paragraph", "heading", "bulletListItem", "numberedListItem", "checkListItem"]:
+            background_tasks.add_task(_embed_block_background, uuid.UUID(block_id) if isinstance(block_id, str) else block_id, content)
+
     return {"status": "success", "processed": len(operations)}
