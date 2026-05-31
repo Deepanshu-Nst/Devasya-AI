@@ -83,6 +83,39 @@ class LLMService:
             )
         )
     
+    async def async_stream_completion(
+        self,
+        prompt: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        messages_list: Optional[list] = None
+    ):
+        """
+        Stream response from LLM asynchronously.
+        """
+        from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+        
+        messages = []
+        if messages_list:
+            for msg in messages_list:
+                if msg.get("role") == "system":
+                    messages.append(SystemMessage(content=msg.get("content", "")))
+                elif msg.get("role") == "assistant":
+                    messages.append(AIMessage(content=msg.get("content", "")))
+                else:
+                    messages.append(HumanMessage(content=msg.get("content", "")))
+        else:
+            if system_prompt:
+                messages.append(SystemMessage(content=system_prompt))
+            if prompt:
+                messages.append(HumanMessage(content=prompt))
+        
+        try:
+            async for chunk in self.llm.astream(messages):
+                yield chunk.content
+        except Exception as e:
+            logger.error(f"Error streaming response: {e}")
+            raise
+
     def generate_structured(
         self,
         prompt: str,

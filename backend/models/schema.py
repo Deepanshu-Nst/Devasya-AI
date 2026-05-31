@@ -247,3 +247,10 @@ class QueryResponse(BaseModel):
         if 'insights' not in data and 'response' in data:
             data['insights'] = data['response']
         super().__init__(**data)
+
+class InlineQueryRequest(BaseModel):
+    """Schema for lightweight inline AI generation."""
+    action: str  # e.g., 'summarize', 'extract_tasks', 'custom'
+    prompt: Optional[str] = None
+    context_blocks: Optional[List[str]] = None
+    current_page_id: Optional[uuid.UUID] = None

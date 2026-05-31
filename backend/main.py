@@ -14,7 +14,7 @@ from backend.db.vector_store import init_vector_store
 from backend.services.llm import init_llm_service
 from backend.services.retrieval import init_retrieval_service
 from backend.services.agents import get_orchestrator
-from backend.api import auth, memory, query, blocks, tasks
+from backend.api import auth, memory, query, blocks, tasks, ai
 from backend.mcp.router import router as mcp_router
 
 # Configure logging
@@ -108,6 +108,7 @@ app.include_router(memory.router)
 app.include_router(query.router)
 app.include_router(blocks.router)
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
+app.include_router(ai.router)
 app.include_router(mcp_router)
 
 
