@@ -2,7 +2,7 @@
 
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/shadcn';
-import { Block, PartialBlock, filterSuggestionItems } from '@blocknote/core';
+import { Block, PartialBlock, filterSuggestionItems, defaultBlockSpecs } from '@blocknote/core';
 import { SuggestionMenuController } from "@blocknote/react";
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/shadcn/style.css';
@@ -17,12 +17,10 @@ interface BlockEditorProps {
 
 export default function BlockEditor({ initialContent, onChange, editable = true }: BlockEditorProps) {
   const { theme } = useTheme();
-
   // Filter unknown block types to prevent Prosemirror 'reading node' crashes
   const knownTypes = new Set([
-    'paragraph', 'heading', 'bulletListItem', 'numberedListItem', 
-    'checkListItem', 'image', 'file', 'video', 'audio', 'table', 
-    'codeBlock', 'database_view', 'ai'
+    ...Object.keys(defaultBlockSpecs),
+    'database_view', 'ai'
   ]);
 
   const sanitizeBlocks = (blocks: any): any[] | undefined => {
@@ -60,10 +58,11 @@ export default function BlockEditor({ initialContent, onChange, editable = true 
 
   // Initialize the editor with initial content.
   // We use useCreateBlockNote to properly manage the editor lifecycle in React.
-  const editor = useCreateBlockNote({
-    schema,
-    initialContent: safeInitialContent as any,
-  });
+  const editorOptions: any = { schema };
+  if (safeInitialContent) {
+    editorOptions.initialContent = safeInitialContent;
+  }
+  const editor = useCreateBlockNote(editorOptions);
 
   return (
     <div className="w-full min-h-[500px]">

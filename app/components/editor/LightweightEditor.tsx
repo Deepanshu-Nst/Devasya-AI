@@ -2,7 +2,7 @@
 
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/shadcn';
-import { Block, PartialBlock, filterSuggestionItems } from '@blocknote/core';
+import { Block, PartialBlock, filterSuggestionItems, defaultBlockSpecs } from '@blocknote/core';
 import { SuggestionMenuController, getDefaultReactSlashMenuItems } from "@blocknote/react";
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/shadcn/style.css';
@@ -17,11 +17,7 @@ interface LightweightEditorProps {
 export default function LightweightEditor({ initialContent, onChange, editable = true }: LightweightEditorProps) {
   const { theme } = useTheme();
 
-  const knownTypes = new Set([
-    'paragraph', 'heading', 'bulletListItem', 'numberedListItem', 
-    'checkListItem', 'image', 'file', 'video', 'audio', 'table', 
-    'codeBlock'
-  ]);
+  const knownTypes = new Set(Object.keys(defaultBlockSpecs));
 
   const sanitizeBlocks = (blocks: any): any[] | undefined => {
     if (!Array.isArray(blocks)) {
@@ -55,9 +51,11 @@ export default function LightweightEditor({ initialContent, onChange, editable =
   const safeInitialContent = sanitizeBlocks(initialContent);
 
   // Create a clean blocknote instance without our custom recursive blocks
-  const editor = useCreateBlockNote({
-    initialContent: safeInitialContent && safeInitialContent.length > 0 ? safeInitialContent : undefined,
-  });
+  const editorOptions: any = {};
+  if (safeInitialContent && safeInitialContent.length > 0) {
+    editorOptions.initialContent = safeInitialContent;
+  }
+  const editor = useCreateBlockNote(editorOptions);
 
   return (
     <div className="w-full h-full min-h-[300px]">
