@@ -46,9 +46,9 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[oklch(0.11_0_0)] text-foreground ambient-field">
-      {/* Matte noise texture */}
-      <div className="bg-noise" />
+    <div className="min-h-screen relative overflow-hidden bg-[oklch(0.11_0_0)] text-foreground">
+      {/* Ambient Depth Layer */}
+      <div className="absolute inset-0 ambient-field pointer-events-none z-0" />
 
       {/* Atmospheric Depth Layering - Multi-stop gradient for vignette falloff */}
       <div 
@@ -99,7 +99,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.6 }}
-            className="flex justify-center max-w-2xl mx-auto mt-12"
+            className="flex justify-center max-w-2xl mx-auto mt-32 relative z-20"
           >
             <form onSubmit={handleSearch} className="w-full relative group">
               <input
@@ -139,10 +139,10 @@ export default function Home() {
           </MotionDiv>
         </MotionDiv>
         {/* Floating Asymmetric Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left mt-24">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left mt-24 relative z-10">
           {features.map((feature, index) => {
-            // Asymmetric spacing and padding to create jazz timing / visual hierarchy
-            const mtClass = index === 0 ? 'mt-0' : index === 1 ? 'mt-16 md:mt-24' : 'mt-8 md:mt-12';
+            // Restrained asymmetric spacing
+            const mtClass = index === 0 ? 'mt-0' : index === 1 ? 'mt-12 md:mt-16' : 'mt-6 md:mt-8';
             const paddingClass = index === 0 ? 'p-8 md:p-10' : 'p-6 md:p-8';
             const titleClass = index === 0 ? 'text-lg md:text-xl' : 'text-base md:text-lg';
             

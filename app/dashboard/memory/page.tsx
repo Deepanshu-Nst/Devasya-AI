@@ -497,7 +497,7 @@ export default function MemoryMode() {
             <div className="absolute inset-0 archival-grid opacity-[0.015] pointer-events-none" />
             <div className="absolute right-[-10%] bottom-[-10%] w-[800px] h-[800px] rounded-full blur-[120px] pointer-events-none opacity-20" style={{ background: 'oklch(0.65 0.20 250 / 0.05)' }} />
             
-            <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }} className="text-right max-w-sm relative z-10 opacity-20">
+            <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }} className="text-right max-w-sm relative z-10 opacity-[0.15] -translate-x-8 translate-y-8">
               <h2 className="text-6xl md:text-8xl font-bold tracking-tighter mb-4 uppercase" style={{ color: 'oklch(0.40 0 0)' }}>Archive</h2>
               <div className="w-16 h-[2px] ml-auto mb-6" style={{ background: 'oklch(0.20 0 0)' }} />
               <p className="text-[13px] leading-relaxed font-semibold tracking-widest uppercase" style={{ color: 'oklch(0.35 0 0)' }}>

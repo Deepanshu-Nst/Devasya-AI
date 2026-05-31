@@ -25,8 +25,19 @@ export default function BlockEditor({ initialContent, onChange, editable = true 
     'codeBlock', 'database_view', 'ai'
   ]);
 
-  const sanitizeBlocks = (blocks: any[]): any[] => {
-    if (!Array.isArray(blocks)) return blocks;
+  const sanitizeBlocks = (blocks: any): any[] => {
+    if (!Array.isArray(blocks)) {
+      if (typeof blocks === 'string') {
+        try {
+          const parsed = JSON.parse(blocks);
+          if (Array.isArray(parsed)) return sanitizeBlocks(parsed);
+          return [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    }
     return blocks.map(b => {
       const isKnown = b.type && knownTypes.has(b.type);
       const sanitized = { ...b };

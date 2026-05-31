@@ -83,8 +83,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div
                 className="relative flex items-center gap-3.5 px-3 py-2.5 rounded-lg transition-all duration-150 group cursor-pointer"
                 style={{
-                  background: 'transparent',
-                  color: isActive ? 'oklch(0.95 0 0)' : 'oklch(0.55 0 0)',
+                  background: isActive ? 'oklch(0.12 0 0)' : 'transparent',
+                  color: isActive ? 'oklch(0.85 0 0)' : 'oklch(0.55 0 0)',
                 }}
                 onMouseEnter={e => {
                   if (!isActive) {
@@ -97,22 +97,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   }
                 }}
               >
-                {/* Active Indicator — Diffuse ambient glow */}
-                {isActive && (
-                  <MotionDiv
-                    layoutId="activeNav"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 rounded-full blur-[12px]"
-                    style={{ background: 'oklch(0.65 0.20 250)', opacity: 0.3 }}
-                    initial={false}
-                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                  />
-                )}
-
-                <item.icon
-                  className={`w-[16px] h-[16px] shrink-0 transition-all duration-150 ${isActive ? 'animate-pulse-glow opacity-100' : 'opacity-40 group-hover:opacity-100'}`}
-                  style={{ color: isActive ? 'oklch(0.65 0.20 250)' : 'inherit' }}
-                />
-                <span className="text-[13px] font-medium leading-none tracking-wide" style={{ color: 'inherit' }}>
+                <item.icon className="w-[18px] h-[18px] shrink-0 transition-transform duration-150 group-hover:scale-105" />
+                <span className="text-[14px] font-medium tracking-tight">
                   {item.name}
                 </span>
               </div>

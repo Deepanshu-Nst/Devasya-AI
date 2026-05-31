@@ -350,16 +350,16 @@ export default function ChatMode() {
                       transition={{ duration: 0.15 }}
                       className="flex gap-5 relative group"
                     >
-                      {/* Conversational Lane */}
-                      {idx % 2 === 0 && (
-                        <div className="absolute inset-y-[-24px] inset-x-[-32px] conversational-lane opacity-[0.04] transition-opacity duration-150 group-hover:opacity-[0.07]" />
+                      {/* Active Conversational Emphasis */}
+                      {idx === messages.length - 1 && m.role === 'assistant' && !loading && (
+                        <div className="absolute inset-y-[-32px] inset-x-[-32px] conversational-lane opacity-[0.05] pointer-events-none" />
                       )}
                       
                       {/* Avatar */}
                       <div className="shrink-0 mt-1 relative z-10">
                         {m.role === 'user' ? (
-                          <div className="w-6 h-6 flex items-center justify-center rounded" style={{ background: 'oklch(0.20 0 0)' }}>
-                            <User className="w-3.5 h-3.5" style={{ color: 'oklch(0.70 0 0)' }} />
+                          <div className="w-6 h-6 flex items-center justify-center">
+                            <User className="w-4 h-4" style={{ color: 'oklch(0.50 0 0)' }} />
                           </div>
                         ) : (
                           <>
@@ -377,7 +377,7 @@ export default function ChatMode() {
                       {/* Content — completely borderless, letting typography breathe */}
                       <div className="flex-1 min-w-0 flex flex-col gap-4 pt-0.5">
                         <div
-                          className="leading-relaxed text-[15px] whitespace-pre-wrap font-medium max-w-[65ch]"
+                          className="leading-relaxed text-[15px] whitespace-pre-wrap font-medium max-w-[60ch]"
                           style={{ color: m.role === 'user' ? 'oklch(0.95 0 0)' : 'oklch(0.85 0 0)' }}
                         >
                           {m.content}
@@ -388,7 +388,7 @@ export default function ChatMode() {
 
                         {/* Reasoning block */}
                         {m.role === 'assistant' && (m.connections || m.actions || (m.context && m.context.length > 0)) && (
-                          <div className="max-w-[65ch]">
+                          <div className="max-w-[60ch]">
                             <button
                               onClick={() => toggleThinking(idx)}
                               className="flex items-center gap-1.5 text-[12px] transition-colors duration-150"
@@ -479,16 +479,16 @@ export default function ChatMode() {
                     <MotionDiv
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="flex gap-5"
+                      className="flex gap-5 relative"
                     >
-                      <div className="shrink-0 mt-1 relative">
-                        <div className="absolute inset-0 bg-[oklch(0.65_0.20_250)] rounded-full blur-[8px] animate-breathe opacity-50 pointer-events-none" />
-                        <Sparkles className="w-6 h-6 animate-pulse-glow relative z-10" style={{ color: 'oklch(0.65 0.20 250)' }} />
+                      <div className="absolute inset-y-[-24px] inset-x-[-32px] conversational-lane opacity-[0.05] animate-breathe pointer-events-none" />
+                      <div className="shrink-0 mt-1 relative z-10">
+                        <Sparkles className="w-5 h-5 opacity-40" style={{ color: 'oklch(0.65 0.20 250)' }} />
                       </div>
-                      <div className="flex-1 space-y-3 pt-2 max-w-[65ch]">
-                        <div className="h-2 w-2/3 ambient-skeleton" />
-                        <div className="h-2 w-1/2 ambient-skeleton-subtle" />
-                        <div className="h-2 w-5/6 ambient-skeleton" />
+                      <div className="flex-1 space-y-3 pt-2 max-w-[60ch]">
+                        <div className="h-1.5 w-2/3 bg-[oklch(0.18_0_0)] rounded-full animate-breathe opacity-20" />
+                        <div className="h-1.5 w-1/2 bg-[oklch(0.18_0_0)] rounded-full animate-breathe opacity-20" />
+                        <div className="h-1.5 w-5/6 bg-[oklch(0.18_0_0)] rounded-full animate-breathe opacity-20" />
                       </div>
                     </MotionDiv>
                   )}
@@ -507,20 +507,19 @@ export default function ChatMode() {
             
             <div className="max-w-2xl mx-auto flex flex-col items-center relative z-10">
               <div
-                className="w-full flex items-end gap-3 px-5 py-3 transition-all duration-150 group rounded-2xl"
+                className="w-full flex items-end gap-3 px-5 py-3 transition-all duration-150 group"
                 style={{ 
-                  background: 'oklch(0.13 0 0 / 0.5)',
-                  borderTop: '1px solid oklch(0.95 0 0 / 0.03)',
-                  boxShadow: 'inset 0 1px 0 oklch(0.95 0 0 / 0.02), inset 0 0 0 transparent, 0 -8px 24px -8px rgba(0,0,0,0.4)',
+                  background: 'oklch(0.11 0 0 / 0.55)',
+                  borderBottom: '1px solid oklch(0.20 0 0)',
                   backdropFilter: 'blur(16px)'
                 }}
                 onFocus={e => {
-                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.14 0 0 / 0.7)';
-                  (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 1px 0 oklch(0.95 0 0 / 0.05), inset 0 0 32px oklch(0.18 0 0 / 0.5), 0 -8px 24px -8px rgba(0,0,0,0.5)';
+                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.12 0 0 / 0.65)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 0 24px oklch(0.14 0 0 / 0.5)';
                 }}
                 onBlur={e => {
-                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.13 0 0 / 0.5)';
-                  (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 1px 0 oklch(0.95 0 0 / 0.02), inset 0 0 0 transparent, 0 -8px 24px -8px rgba(0,0,0,0.4)';
+                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.11 0 0 / 0.55)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'none';
                 }}
               >
                 <div className="flex flex-col justify-end pb-2">
