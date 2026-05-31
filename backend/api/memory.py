@@ -196,7 +196,7 @@ def list_memories(
         total = len(items)
         paginated = items[skip: skip + limit]
 
-        logger.info(f"Listed {len(memory_pages)} notes + {len(documents)} docs for user {user_id}")
+        logger.info(f"Listed {len(block_pages)} notes + {len(documents)} docs for user {user_id}")
 
         return {
             "total": total,
