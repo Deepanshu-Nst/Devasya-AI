@@ -288,12 +288,13 @@ INSTRUCTIONS:
 4. If no tools ran and no memory exists, respond naturally and helpfully.
 5. Think like a senior advisor who knows this person deeply.
 
-Output JSON only:
+Output strictly valid JSON only:
 {{
     "insight": "Your internal strategic thinking — how you are connecting all data sources.",
-    "answer": "Your final, authoritative, beautifully formatted response to the user.",
+    "answer": "Your final, authoritative, beautifully formatted response to the user. (CRITICAL: Use '\\n' for newlines, DO NOT output raw newlines inside the string!)",
     "action": "The single most important next action the user should take right now."
-}}"""
+}}
+(Ensure the output is 100% parseable by json.loads() - escape all quotes and newlines!)"""
 
         messages_list.append({"role": "user", "content": current_content})
 
