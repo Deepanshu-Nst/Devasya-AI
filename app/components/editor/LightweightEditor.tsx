@@ -17,9 +17,25 @@ interface LightweightEditorProps {
 export default function LightweightEditor({ initialContent, onChange, editable = true }: LightweightEditorProps) {
   const { theme } = useTheme();
 
+  let safeInitialContent: any = undefined;
+  if (initialContent) {
+    if (typeof initialContent === 'string') {
+      try {
+        const parsed = JSON.parse(initialContent);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          safeInitialContent = parsed;
+        }
+      } catch (e) {
+        // ignore
+      }
+    } else if (Array.isArray(initialContent) && initialContent.length > 0) {
+      safeInitialContent = initialContent;
+    }
+  }
+
   // Create a clean blocknote instance without our custom recursive blocks
   const editor = useCreateBlockNote({
-    initialContent: initialContent && initialContent.length > 0 ? initialContent as any : undefined,
+    initialContent: safeInitialContent,
   });
 
   return (
