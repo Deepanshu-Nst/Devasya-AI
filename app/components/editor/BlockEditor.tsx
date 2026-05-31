@@ -25,18 +25,18 @@ export default function BlockEditor({ initialContent, onChange, editable = true 
     'codeBlock', 'database_view', 'ai'
   ]);
 
-  const sanitizeBlocks = (blocks: any): any[] => {
+  const sanitizeBlocks = (blocks: any): any[] | undefined => {
     if (!Array.isArray(blocks)) {
       if (typeof blocks === 'string') {
         try {
           const parsed = JSON.parse(blocks);
           if (Array.isArray(parsed)) return sanitizeBlocks(parsed);
-          return [];
+          return undefined;
         } catch {
-          return [];
+          return undefined;
         }
       }
-      return [];
+      return undefined;
     }
     return blocks.map(b => {
       const isKnown = b.type && knownTypes.has(b.type);
@@ -48,15 +48,15 @@ export default function BlockEditor({ initialContent, onChange, editable = true 
         sanitized.props = {}; // clear unsupported props
       }
       if (sanitized.children && Array.isArray(sanitized.children)) {
-        sanitized.children = sanitizeBlocks(sanitized.children);
+        const sanitizedChildren = sanitizeBlocks(sanitized.children);
+        if (sanitizedChildren) sanitized.children = sanitizedChildren;
       }
       return sanitized;
     });
   };
 
-  const safeInitialContent = initialContent && initialContent.length > 0 
-    ? sanitizeBlocks(initialContent) 
-    : undefined;
+  const sanitized = sanitizeBlocks(initialContent);
+  const safeInitialContent = sanitized && sanitized.length > 0 ? sanitized : undefined;
 
   // Initialize the editor with initial content.
   // We use useCreateBlockNote to properly manage the editor lifecycle in React.

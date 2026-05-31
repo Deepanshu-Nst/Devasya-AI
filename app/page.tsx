@@ -141,9 +141,9 @@ export default function Home() {
         {/* Floating Asymmetric Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left mt-24 relative z-10">
           {features.map((feature, index) => {
-            // Restrained asymmetric spacing
-            const mtClass = index === 0 ? 'mt-0' : index === 1 ? 'mt-12 md:mt-16' : 'mt-6 md:mt-8';
-            const paddingClass = index === 0 ? 'p-8 md:p-10' : 'p-6 md:p-8';
+            // Tonal density and spacing rhythm instead of exaggerated physical offset
+            const mtClass = index === 0 ? 'mt-0' : index === 1 ? 'mt-8 md:mt-12' : 'mt-4 md:mt-6';
+            const paddingClass = index === 0 ? 'p-8 md:p-10' : index === 1 ? 'p-6 md:p-8' : 'p-7 md:p-9';
             const titleClass = index === 0 ? 'text-lg md:text-xl' : 'text-base md:text-lg';
             
             return (
@@ -154,8 +154,8 @@ export default function Home() {
                 transition={{ delay: 0.4 + index * 0.1, duration: 0.8 }}
                 className={`flex flex-col relative group ${mtClass} ${paddingClass} rounded-3xl transition-all duration-500`}
                 style={{
-                  background: index === 0 ? 'oklch(0.13 0 0)' : 'transparent',
-                  borderTop: index !== 0 ? '1px solid oklch(0.18 0 0)' : 'none',
+                  background: index === 0 ? 'oklch(0.12 0 0)' : index === 1 ? 'oklch(0.10 0 0)' : 'oklch(0.11 0 0)',
+                  borderTop: index === 1 ? '1px solid oklch(0.16 0 0)' : index === 2 ? '1px solid oklch(0.14 0 0)' : 'none',
                 }}
               >
                 {/* Micro-tonal hover separation */}
