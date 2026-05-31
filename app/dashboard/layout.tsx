@@ -31,14 +31,17 @@ export default function DashboardLayout({
     }
   }, [supabaseUser, isLoading, router]);
 
-  // Bug 3 Fix: Proper sign-out that clears BOTH Supabase session and local store
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
-      // AuthProvider's onAuthStateChange will auto-call logout() on the store
+      // 'global' scope revokes the refresh token server-side so this session
+      // cannot be silently restored from any tab or device.
+      await supabase.auth.signOut({ scope: 'global' });
     } catch (err) {
-      console.error('Sign out error:', err);
+      console.error('Sign out error (non-fatal):', err);
     } finally {
+      // Explicitly clear in-memory store regardless of signOut outcome
+      const { logout } = useAuthStore.getState();
+      logout();
       router.push('/auth');
     }
   };

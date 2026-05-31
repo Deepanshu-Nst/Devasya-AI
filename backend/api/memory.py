@@ -21,12 +21,53 @@ router = APIRouter(prefix="/api/memory", tags=["memory"])
 
 # Initialize Supabase client for storage operations
 # We use SERVICE_ROLE_KEY here to bypass RLS for server-side uploads.
-# Falls back to ANON_KEY if service role key is not configured (storage upload may fail due to RLS).
+# Falls back to ANON_KEY if service role key is not configured.
 _supabase_key = settings.SUPABASE_SERVICE_ROLE_KEY or os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or settings.SUPABASE_ANON_KEY
 supabase: Client = create_client(
     settings.SUPABASE_URL,
     _supabase_key
 )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SERIALIZATION HELPERS
+# These convert ORM objects to plain Python dicts WHILE the DB session is open,
+# avoiding SQLAlchemy 2.0 lazy-load failures on detached objects.
+# We do NOT use Pydantic ORM mode / from_orm / model_validate here because
+# those can fail when the session closes before serialization completes.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _serialize_memory(m: MemoryPage) -> dict:
+    """Convert a MemoryPage ORM object to a plain dict for JSON response."""
+    return {
+        "id": str(m.id),
+        "workspace_id": str(m.workspace_id),
+        "title": m.title,
+        "content": m.content,
+        "visibility": m.visibility or "private",
+        "created_at": m.created_at.isoformat() if m.created_at else None,
+        "meta_data": None,
+    }
+
+
+def _serialize_document(doc: Document) -> dict:
+    """Convert a Document ORM object to a list-compatible dict for JSON response."""
+    return {
+        "id": str(doc.id),
+        "workspace_id": str(doc.workspace_id),
+        "title": doc.file_name,
+        "content": f"Document: {doc.file_name}",
+        "visibility": "private",
+        "created_at": doc.created_at.isoformat() if doc.created_at else None,
+        "meta_data": {
+            "type": "document",
+            "source": doc.file_name,
+            "status": doc.embedding_status,
+            "file_type": doc.file_type,
+            "file_size": doc.file_size,
+            "file_url": doc.file_url,
+        },
+    }
+
 
 def get_user_workspace(db: Session, user_id: uuid.UUID) -> uuid.UUID:
     """Helper to get or create the default workspace for a user."""
@@ -38,7 +79,8 @@ def get_user_workspace(db: Session, user_id: uuid.UUID) -> uuid.UUID:
         db.refresh(workspace)
     return workspace.id
 
-@router.post("/add", response_model=MemoryResponse)
+
+@router.post("/add")
 def add_memory(
     memory_data: MemoryCreate,
     current_user: Profile = Depends(get_current_user),
@@ -47,9 +89,8 @@ def add_memory(
     """Add a new memory page to user's knowledge base."""
     user_id = current_user.id
     workspace_id = get_user_workspace(db, user_id)
-    
+
     try:
-        # Create MemoryPage record
         new_memory = MemoryPage(
             workspace_id=workspace_id,
             created_by=user_id,
@@ -60,8 +101,11 @@ def add_memory(
         db.add(new_memory)
         db.commit()
         db.refresh(new_memory)
-        
-        # Embed and index the content (best-effort — never fails the whole request)
+
+        # Serialize immediately while session is still open
+        result = _serialize_memory(new_memory)
+
+        # Embed (best-effort — never blocks the save)
         try:
             from backend.services.document_parser import chunk_text
             chunks = chunk_text(memory_data.content, chunk_size=1000, overlap=100)
@@ -72,18 +116,14 @@ def add_memory(
             )
             logger.info(f"MemoryPage {new_memory.id} embedded and stored")
         except Exception as embed_err:
-            logger.warning(
-                f"Embedding failed for memory {new_memory.id} (content saved, search degraded): {embed_err}"
-            )
-        
-        resp = MemoryResponse.model_validate(new_memory)
-        return resp.model_dump()
-    
+            logger.warning(f"Embedding skipped for memory {new_memory.id}: {embed_err}")
+
+        return result
+
     except Exception as e:
         db.rollback()
         import traceback
-        tb = traceback.format_exc()
-        logger.error(f"Error adding memory: {e}\n{tb}")
+        logger.error(f"Error adding memory: {e}\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error adding memory: {str(e)}"
@@ -93,67 +133,55 @@ def add_memory(
 @router.get("/list")
 def list_memories(
     skip: int = 0,
-    limit: int = 10,
+    limit: int = 100,
     current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """List user's memory pages with pagination."""
+    """List user's memory pages AND uploaded documents with pagination."""
     user_id = current_user.id
-    
+
     try:
-        # Get all workspace IDs owned by user
-        workspaces = db.query(Workspace.id).filter(Workspace.owner_id == user_id).subquery()
-        
-        # ── 1. Memory Pages (user-written notes) ─────────────────────────────
+        # Get all workspace IDs owned by this user
+        workspace_ids = [
+            row[0]
+            for row in db.query(Workspace.id).filter(Workspace.owner_id == user_id).all()
+        ]
+
+        if not workspace_ids:
+            return {"total": 0, "skip": skip, "limit": limit, "memories": []}
+
+        # ── 1. Memory Pages (text notes) ──────────────────────────────────────
         memory_pages = db.query(MemoryPage).filter(
-            MemoryPage.workspace_id.in_(workspaces)
-        ).all()
-        
-        # Pydantic v2 uses model_validate() instead of from_orm()
-        memories_out = []
-        for m in memory_pages:
-            try:
-                memories_out.append(MemoryResponse.model_validate(m))
-            except Exception:
-                # Fallback for any ORM mapping edge cases
-                memories_out.append(MemoryResponse(
-                    id=m.id,
-                    workspace_id=m.workspace_id,
-                    title=m.title,
-                    content=m.content,
-                    visibility=m.visibility or "private",
-                    created_at=m.created_at,
-                ))
-        
-        # ── 2. Uploaded Documents (show as separate cards in the sidebar) ────
-        # Documents are stored in the `documents` table, NOT `memory_pages`.
-        # We convert them to a compatible shape so the frontend can render them.
+            MemoryPage.workspace_id.in_(workspace_ids)
+        ).order_by(MemoryPage.created_at.desc()).all()
+
+        # Serialize INSIDE the session (while attributes are accessible)
+        items = [_serialize_memory(m) for m in memory_pages]
+
+        # ── 2. Uploaded Documents ─────────────────────────────────────────────
+        # Documents live in the `documents` table — they would be invisible to
+        # the list endpoint unless we explicitly query them here.
         documents = db.query(Document).filter(
-            Document.workspace_id.in_(workspaces)
-        ).all()
-        
-        for doc in documents:
-            # Represent each document as a pseudo-MemoryResponse with meta_data
-            memories_out.append(MemoryResponse(
-                id=doc.id,
-                workspace_id=doc.workspace_id,
-                title=doc.file_name,
-                content=f"Document: {doc.file_name} ({doc.embedding_status})",
-                visibility="private",
-                created_at=doc.created_at,
-                meta_data={"type": "document", "source": doc.file_name, "status": doc.embedding_status}
-            ))
-        
-        total = len(memories_out)
-        # Apply pagination after merge
-        paginated = memories_out[skip: skip + limit]
-        
+            Document.workspace_id.in_(workspace_ids)
+        ).order_by(Document.created_at.desc()).all()
+
+        items.extend([_serialize_document(doc) for doc in documents])
+
+        # Sort combined list by created_at (newest first)
+        items.sort(key=lambda x: x["created_at"] or "", reverse=True)
+
+        total = len(items)
+        paginated = items[skip: skip + limit]
+
+        logger.info(f"Listed {len(memory_pages)} notes + {len(documents)} docs for user {user_id}")
+
         return {
             "total": total,
             "skip": skip,
             "limit": limit,
-            "memories": [m.model_dump() for m in paginated]
+            "memories": paginated,
         }
+
     except Exception as e:
         import traceback
         logger.error(f"Error listing memories: {e}\n{traceback.format_exc()}")
@@ -163,7 +191,7 @@ def list_memories(
         )
 
 
-@router.get("/{memory_id}", response_model=MemoryResponse)
+@router.get("/{memory_id}")
 def get_memory(
     memory_id: str,
     current_user: Profile = Depends(get_current_user),
@@ -171,82 +199,85 @@ def get_memory(
 ):
     """Get a specific memory page."""
     user_id = current_user.id
-    workspaces = db.query(Workspace.id).filter(Workspace.owner_id == user_id).subquery()
-    
+
     try:
         mem_uuid = uuid.UUID(memory_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid memory ID")
-    
+
+    workspace_ids = [
+        row[0]
+        for row in db.query(Workspace.id).filter(Workspace.owner_id == user_id).all()
+    ]
+
     memory = db.query(MemoryPage).filter(
         MemoryPage.id == mem_uuid,
-        MemoryPage.workspace_id.in_(workspaces)
+        MemoryPage.workspace_id.in_(workspace_ids)
     ).first()
-    
+
     if not memory:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Memory not found"
-        )
-    
-    return MemoryResponse.model_validate(memory).model_dump()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory not found")
+
+    return _serialize_memory(memory)
 
 
-@router.put("/{memory_id}", response_model=MemoryResponse)
+@router.put("/{memory_id}")
 def update_memory(
     memory_id: str,
     memory_update: MemoryCreate,
     current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Edit memory details. (This creates new vector chunks)."""
+    """Edit memory content."""
     user_id = current_user.id
-    workspaces = db.query(Workspace.id).filter(Workspace.owner_id == user_id).subquery()
-    
+
     try:
         mem_uuid = uuid.UUID(memory_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid memory ID")
-        
+
+    workspace_ids = [
+        row[0]
+        for row in db.query(Workspace.id).filter(Workspace.owner_id == user_id).all()
+    ]
+
     memory = db.query(MemoryPage).filter(
         MemoryPage.id == mem_uuid,
-        MemoryPage.workspace_id.in_(workspaces)
+        MemoryPage.workspace_id.in_(workspace_ids)
     ).first()
-    
+
     if not memory:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Memory not found"
-        )
-        
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory not found")
+
     try:
         memory.content = memory_update.content
-        if memory_update.title:
+        if memory_update.title is not None:
             memory.title = memory_update.title
         if memory_update.visibility:
             memory.visibility = memory_update.visibility
-            
+
         db.commit()
         db.refresh(memory)
-        
-        # Re-embed (best-effort — never fails the update request)
+
+        # Serialize immediately
+        result = _serialize_memory(memory)
+
+        # Re-embed (best-effort)
         try:
-            from backend.models.schema import DocumentChunk
             db.query(DocumentChunk).filter(DocumentChunk.memory_id == memory.id).delete()
             db.commit()
-                
             from backend.services.document_parser import chunk_text
             chunks = chunk_text(memory_update.content, chunk_size=1000, overlap=100)
-            
             vector_store = get_vector_store()
             vector_store.add_chunks(
                 chunks=chunks if chunks else [memory_update.content],
                 memory_id=memory.id
             )
         except Exception as embed_err:
-            logger.warning(f"Re-embedding failed for memory {memory.id} (content updated, search degraded): {embed_err}")
-        
-        return MemoryResponse.model_validate(memory).model_dump()
+            logger.warning(f"Re-embedding skipped for memory {memory.id}: {embed_err}")
+
+        return result
+
     except Exception as e:
         db.rollback()
         logger.error(f"Error updating memory: {e}")
@@ -264,33 +295,29 @@ def delete_memory(
 ):
     """Delete a memory page."""
     user_id = current_user.id
-    workspaces = db.query(Workspace.id).filter(Workspace.owner_id == user_id).subquery()
-    
+
     try:
         mem_uuid = uuid.UUID(memory_id)
     except ValueError:
-        # If it's a temporary ID from the frontend that wasn't saved yet, just return success
-        return {"message": "Temporary memory deleted"}
-        
+        raise HTTPException(status_code=400, detail="Invalid memory ID")
+
+    workspace_ids = [
+        row[0]
+        for row in db.query(Workspace.id).filter(Workspace.owner_id == user_id).all()
+    ]
+
     memory = db.query(MemoryPage).filter(
         MemoryPage.id == mem_uuid,
-        MemoryPage.workspace_id.in_(workspaces)
+        MemoryPage.workspace_id.in_(workspace_ids)
     ).first()
-    
+
     if not memory:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Memory not found"
-        )
-    
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory not found")
+
     try:
-        # Delete from DB (cascade deletes the DocumentChunk records)
         db.delete(memory)
         db.commit()
-        
-        logger.info(f"Memory {memory_id} deleted for user {user_id}")
         return {"message": "Memory deleted successfully"}
-    
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting memory: {e}")
@@ -309,15 +336,13 @@ async def upload_document(
     """Upload a document to Supabase Storage, parse it, and store chunks in pgvector."""
     user_id = current_user.id
     workspace_id = get_user_workspace(db, user_id)
-    
+
     try:
         from backend.services.document_parser import extract_text_from_file, chunk_text
-        
+
         file_content = await file.read()
-        
-        # 1. Try to upload to Supabase Storage with strict timeout
-        # The supabase-py client has no built-in per-request timeout, so we run
-        # it in a thread and enforce a 10-second limit ourselves.
+
+        # 1. Try to upload to Supabase Storage with strict 10s timeout
         file_url = ""
         file_path = f"{user_id}/{uuid.uuid4()}_{file.filename}"
         try:
@@ -332,34 +357,26 @@ async def upload_document(
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                 future = pool.submit(_storage_upload)
-                future.result(timeout=10)  # Abort if Supabase takes > 10 s
+                future.result(timeout=10)
 
             file_url = supabase.storage.from_("documents").get_public_url(file_path)
             logger.info(f"File uploaded to Supabase Storage: {file_path}")
         except concurrent.futures.TimeoutError:
-            logger.warning(
-                "Supabase Storage upload timed out after 10 s — skipping cloud backup, "
-                "continuing with local text processing."
-            )
+            logger.warning("Supabase Storage upload timed out — storing metadata only")
             file_url = f"local://{file.filename}"
         except Exception as storage_err:
-            logger.warning(
-                f"Supabase Storage upload failed: {storage_err}. "
-                "Continuing with text extraction and embedding only."
-            )
+            logger.warning(f"Supabase Storage upload failed: {storage_err} — storing metadata only")
             file_url = f"local://{file.filename}"
-        
+
         # 2. Extract Text
         text = extract_text_from_file(file_content, file.filename)
-        
         if not text:
             raise ValueError("No extractable text found in file")
-            
+
         chunks = chunk_text(text, chunk_size=1000, overlap=100)
-        
         if not chunks:
             raise ValueError("File content too short or failed to chunk")
-            
+
         # 3. Save Document record first (always succeeds independently of embedding)
         document = Document(
             workspace_id=workspace_id,
@@ -373,34 +390,30 @@ async def upload_document(
         db.add(document)
         db.commit()
         db.refresh(document)
-            
+
+        # Serialize immediately while session is open
+        doc_id = str(document.id)
+
         # 4. Generate and save Embeddings (best-effort — upload ALWAYS succeeds)
         try:
             vector_store = get_vector_store()
-            vector_store.add_chunks(
-                chunks=chunks,
-                document_id=document.id
-            )
-            # Mark embedding complete
+            vector_store.add_chunks(chunks=chunks, document_id=document.id)
             document.embedding_status = "completed"
             db.commit()
             logger.info(f"Processed {file.filename} into {len(chunks)} chunks for user {user_id}")
         except Exception as embed_err:
-            logger.warning(
-                f"Embedding failed for document {document.id} (file saved, search degraded): {embed_err}"
-            )
+            logger.warning(f"Embedding skipped for document {doc_id}: {embed_err}")
             document.embedding_status = "failed"
             db.commit()
-            
-        return {"message": "Document uploaded and processed successfully", "document_id": str(document.id)}
-    
+
+        return {"message": "Document uploaded and processed successfully", "document_id": doc_id}
+
     except Exception as e:
         db.rollback()
         import traceback
         tb = traceback.format_exc()
-        print(f"Error processing document upload: {e}\n{tb}")
         logger.error(f"Error processing document upload: {e}\n{tb}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing document: {str(e)}\n\nTraceback:\n{tb}"
+            detail=f"Error processing document: {str(e)}"
         )

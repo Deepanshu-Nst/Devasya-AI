@@ -15,19 +15,15 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        router.push('/dashboard');
-      }
-    };
-    checkUser();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        router.push('/dashboard');
+    // NOTE: We do NOT auto-redirect on load based on getSession().
+    // Reason: supabase.auth.signOut() clears localStorage but the signOut call
+    // completes async AFTER we navigate to /auth. If we immediately call
+    // getSession() on load, we may still see the old session and redirect back.
+    // Instead, we only redirect when a NEW sign-in event fires.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Only redirect on an actual new login, not on the initial session load
+      if (event === 'SIGNED_IN' && session) {
+        router.push('/dashboard/chat');
       }
     });
 
@@ -42,7 +38,10 @@ export default function AuthPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`
+          redirectTo: `${window.location.origin}/dashboard/chat`,
+          // Force the Google account chooser every time so users
+          // aren't silently signed in with a previous account after logout
+          queryParams: { prompt: 'select_account' },
         }
       });
       
