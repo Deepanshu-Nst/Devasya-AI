@@ -81,7 +81,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           return (
             <Link key={item.name} href={item.href}>
               <div
-                className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-300 group cursor-pointer"
+                className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ease-out group cursor-pointer"
                 style={{
                   background: 'transparent',
                   color: isActive ? 'oklch(0.95 0 0)' : 'oklch(0.50 0 0)',
@@ -93,19 +93,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   if (!isActive) (e.currentTarget as HTMLElement).style.color = 'oklch(0.50 0 0)';
                 }}
               >
-                {/* Active Indicator — Soft radial glow instead of hard line */}
+                {/* Active Indicator — Diffuse ambient glow */}
                 {isActive && (
                   <MotionDiv
                     layoutId="activeNav"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-full blur-[4px]"
-                    style={{ background: 'oklch(0.65 0.20 250)' }}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-10 rounded-full blur-[10px]"
+                    style={{ background: 'oklch(0.65 0.20 250)', opacity: 0.4 }}
                     initial={false}
                     transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                   />
                 )}
 
                 <item.icon
-                  className={`w-[16px] h-[16px] shrink-0 transition-all duration-300 ${isActive ? 'animate-pulse-glow' : ''}`}
+                  className={`w-[16px] h-[16px] shrink-0 transition-all duration-200 ease-out ${isActive ? 'animate-pulse-glow' : ''}`}
                   style={{ color: isActive ? 'oklch(0.65 0.20 250)' : 'inherit' }}
                 />
                 <span className="text-[13px] font-medium leading-none" style={{ color: 'inherit' }}>
@@ -120,12 +120,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Footer Area */}
       <div className="px-3 pb-6">
         <div className="px-3 py-3 flex items-center justify-between group">
-          <span className="text-[12px] font-medium truncate transition-colors duration-300" style={{ color: 'oklch(0.60 0 0)' }}>
+          <span className="text-[12px] font-medium truncate transition-colors duration-200 ease-out" style={{ color: 'oklch(0.60 0 0)' }}>
             {displayName}
           </span>
           <button
             onClick={handleLogout}
-            className="opacity-0 group-hover:opacity-100 transition-all duration-300"
+            className="opacity-0 group-hover:opacity-100 transition-all duration-200 ease-out"
             title="Sign Out"
             style={{ color: 'oklch(0.40 0 0)' }}
             onMouseEnter={e => {

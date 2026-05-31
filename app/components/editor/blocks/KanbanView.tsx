@@ -188,7 +188,7 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
 
   return (
     <>
-      <div className="flex gap-8 overflow-x-auto h-full styled-scrollbar pr-8">
+      <div className="flex gap-12 overflow-x-auto h-full styled-scrollbar pr-12 pl-6 pt-6 pb-12">
         {statuses.map(status => {
           const config = STATUS_CONFIG[status] || STATUS_CONFIG['Todo'];
           const StatusIcon = config.icon;
@@ -200,9 +200,9 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
           return (
             <div
               key={status}
-              className="flex-1 min-w-[260px] max-w-[320px] flex flex-col transition-colors duration-150"
+              className="flex-1 min-w-[280px] max-w-[340px] flex flex-col transition-all duration-300 rounded-2xl p-4"
               style={{
-                background: isDragOver ? 'oklch(0.13 0 0)' : 'transparent',
+                background: isDragOver ? 'oklch(0.12 0 0)' : 'transparent',
               }}
               onDragOver={e => { e.preventDefault(); setDragOverColumn(status); }}
               onDragLeave={() => setDragOverColumn(null)}
@@ -214,24 +214,30 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
               }}
             >
               {/* Minimal Column Header */}
-              <div className="pb-3 flex items-center gap-2 shrink-0 border-b border-[oklch(0.20_0_0)]">
+              <div className="pb-4 flex items-center gap-3 shrink-0">
                 <StatusIcon className="w-4 h-4 shrink-0" style={{ color: config.color }} />
-                <span className="text-[12px] font-semibold uppercase tracking-wider flex-1" style={{ color: 'oklch(0.60 0 0)' }}>
-                  {status} <span className="opacity-50 font-normal">({columnTasks.length})</span>
+                <span className="text-[13px] font-medium tracking-wide flex-1" style={{ color: 'oklch(0.60 0 0)' }}>
+                  {status} <span className="opacity-40 font-normal ml-1">({columnTasks.length})</span>
                 </span>
                 <button
                   onClick={() => setCreatingInColumn(status)}
-                  className="w-5 h-5 flex items-center justify-center transition-colors"
+                  className="w-6 h-6 flex items-center justify-center transition-colors rounded-full"
                   style={{ color: 'oklch(0.40 0 0)' }}
-                  onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = 'oklch(0.95 0 0)')}
-                  onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'oklch(0.40 0 0)')}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.color = 'oklch(0.95 0 0)';
+                    (e.currentTarget as HTMLElement).style.background = 'oklch(0.15 0 0)';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.color = 'oklch(0.40 0 0)';
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  }}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Column body */}
-              <div className="flex-1 overflow-y-auto pt-4 space-y-3 no-scrollbar">
+              <div className="flex-1 overflow-y-auto pt-2 space-y-4 no-scrollbar">
                 <AnimatePresence>
                   {creatingInColumn === status && (
                     <InlineCreateInput

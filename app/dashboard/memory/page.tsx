@@ -307,34 +307,32 @@ export default function MemoryMode() {
     return (
       <button
         onClick={() => handleSelect(item)}
-        className="w-full group flex items-center gap-2.5 px-3 py-1.5 text-left transition-all duration-300 relative"
+        className="w-full group flex items-center gap-3 px-4 py-2.5 text-left transition-all duration-200 ease-out relative"
         style={{ color: isActive ? 'oklch(0.95 0 0)' : 'oklch(0.50 0 0)' }}
         onMouseEnter={e => {
           if (!isActive) {
             (e.currentTarget as HTMLElement).style.color = 'oklch(0.85 0 0)';
-            (e.currentTarget as HTMLElement).style.textShadow = '0 0 8px oklch(0.85 0 0 / 0.3)';
           }
         }}
         onMouseLeave={e => {
           if (!isActive) {
             (e.currentTarget as HTMLElement).style.color = 'oklch(0.50 0 0)';
-            (e.currentTarget as HTMLElement).style.textShadow = 'none';
           }
         }}
       >
         {isActive && (
           <span 
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-full blur-[3px]" 
-            style={{ background: 'oklch(0.65 0.20 250)' }} 
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 rounded-full blur-[4px]" 
+            style={{ background: 'oklch(0.65 0.20 250)', opacity: 0.6 }} 
           />
         )}
         {item.isDocInfo ? (
-          <FileText className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 ${isActive ? 'opacity-100 animate-pulse-glow' : 'opacity-40'}`} />
+          <FileText className={`w-3.5 h-3.5 shrink-0 transition-all duration-200 ease-out ${isActive ? 'opacity-100 animate-pulse-glow' : 'opacity-40'}`} />
         ) : (
-          <AlignLeft className={`w-3.5 h-3.5 shrink-0 transition-all duration-300 ${isActive ? 'opacity-100 animate-pulse-glow' : 'opacity-40'}`} />
+          <AlignLeft className={`w-3.5 h-3.5 shrink-0 transition-all duration-200 ease-out ${isActive ? 'opacity-100 animate-pulse-glow' : 'opacity-40'}`} />
         )}
-        <span className="text-[13px] truncate flex-1 leading-tight">{item.isDocInfo ? item.source : item.title || 'Untitled'}</span>
-        <span className="text-[11px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 shrink-0 font-mono" style={{ color: 'oklch(0.35 0 0)' }}>
+        <span className="text-[14px] truncate flex-1 leading-relaxed">{item.isDocInfo ? item.source : item.title || 'Untitled'}</span>
+        <span className="text-[11px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0 font-mono" style={{ color: 'oklch(0.35 0 0)' }}>
           {formatRelativeDate(item.created_at)}
         </span>
       </button>

@@ -423,24 +423,57 @@ export default function ChatMode() {
                             </AnimatePresence>
                           </div>
                         )}
+
+                        {/* Follow-up actions (only on AI messages) */}
+                        {msg.role === 'assistant' && msg.actions && msg.actions.length > 0 && (
+                          <div className="mt-6 flex flex-wrap gap-2">
+                            {msg.actions.map(action => (
+                              <button
+                                key={action}
+                                onClick={() => handleActionClick(action)}
+                                disabled={loading}
+                                className="px-3 py-1.5 text-[12px] font-medium border rounded-md transition-all duration-200 ease-out disabled:opacity-50"
+                                style={{
+                                  borderColor: 'oklch(0.20 0 0)',
+                                  color: 'oklch(0.65 0 0)',
+                                }}
+                                onMouseEnter={e => {
+                                  if (!loading) {
+                                    (e.currentTarget as HTMLElement).style.borderColor = 'oklch(0.65 0.20 250 / 0.5)';
+                                    (e.currentTarget as HTMLElement).style.color = 'oklch(0.65 0.20 250)';
+                                  }
+                                }}
+                                onMouseLeave={e => {
+                                  if (!loading) {
+                                    (e.currentTarget as HTMLElement).style.borderColor = 'oklch(0.20 0 0)';
+                                    (e.currentTarget as HTMLElement).style.color = 'oklch(0.65 0 0)';
+                                  }
+                                }}
+                              >
+                                {action}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </MotionDiv>
                   ))}
 
-                  {loading && (
+                  {/* Ambient Skeleton Loading State */}
+                  {loading && !messages[messages.length - 1]?.content && (
                     <MotionDiv
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="flex gap-4"
+                      className="flex gap-5"
                     >
-                      <div className="shrink-0 mt-0.5 relative">
-                        {/* Ambient glow behind loading avatar */}
+                      <div className="shrink-0 mt-1 relative">
                         <div className="absolute inset-0 bg-[oklch(0.65_0.20_250)] rounded-full blur-[8px] animate-breathe opacity-50" />
                         <Sparkles className="w-6 h-6 animate-pulse-glow relative z-10" style={{ color: 'oklch(0.65 0.20 250)' }} />
                       </div>
-                      <div className="flex items-center py-1">
-                        {/* Blinking block cursor for intelligence feel */}
-                        <span className="animate-cursor text-[15px]" style={{ color: 'oklch(0.65 0.20 250)' }}>▍</span>
+                      <div className="flex-1 space-y-3 pt-2">
+                        <div className="h-2 w-2/3 ambient-skeleton" />
+                        <div className="h-2 w-1/2 ambient-skeleton-subtle" />
+                        <div className="h-2 w-5/6 ambient-skeleton" />
                       </div>
                     </MotionDiv>
                   )}
@@ -457,23 +490,21 @@ export default function ChatMode() {
             {/* Subtle gradient to obscure content behind the composer */}
             <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to top, oklch(0.11 0 0) 60%, transparent)' }} />
             
-            <div className="max-w-3xl mx-auto flex flex-col items-center relative z-10">
+            <div className="max-w-2xl mx-auto flex flex-col items-center relative z-10">
               <div
-                className="w-full flex items-end gap-3 px-4 py-2 rounded-xl transition-all duration-300 group"
-                style={{ background: 'oklch(0.13 0 0)' }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.boxShadow = '0 0 16px 0 oklch(0.65 0.20 250 / 0.08)';
-                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.14 0 0)';
+                className="w-full flex items-end gap-3 px-4 py-2 transition-all duration-200 ease-out group border-b border-transparent"
+                style={{ background: 'transparent' }}
+                onFocus={e => {
+                  (e.currentTarget as HTMLElement).style.borderBottomColor = 'oklch(0.65 0.20 250 / 0.3)';
                 }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.boxShadow = 'none';
-                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.13 0 0)';
+                onBlur={e => {
+                  (e.currentTarget as HTMLElement).style.borderBottomColor = 'transparent';
                 }}
               >
                 <div className="flex flex-col justify-end pb-2">
                   <button
                     onClick={() => setIsDeepThinking(!isDeepThinking)}
-                    className="w-6 h-6 flex items-center justify-center transition-all duration-300"
+                    className="w-6 h-6 flex items-center justify-center transition-all duration-200 ease-out"
                     title={isDeepThinking ? "Deep Thinking: ON" : "Deep Thinking: OFF"}
                     style={{ color: isDeepThinking ? 'oklch(0.65 0.20 250)' : 'oklch(0.40 0 0)' }}
                     onMouseEnter={e => {
@@ -503,17 +534,15 @@ export default function ChatMode() {
                   <button
                     onClick={() => handleSend()}
                     disabled={!input.trim() || loading}
-                    className="w-8 h-8 flex items-center justify-center transition-all duration-300 disabled:opacity-20"
+                    className="w-8 h-8 flex items-center justify-center transition-all duration-200 ease-out disabled:opacity-20"
                     style={{ color: 'oklch(0.95 0 0)' }}
                     onMouseEnter={e => {
                       if (!(!input.trim() || loading)) {
                         (e.currentTarget as HTMLElement).style.color = 'oklch(0.65 0.20 250)';
-                        (e.currentTarget as HTMLElement).style.filter = 'drop-shadow(0 0 6px oklch(0.65 0.20 250 / 0.6))';
                       }
                     }}
                     onMouseLeave={e => {
                       (e.currentTarget as HTMLElement).style.color = 'oklch(0.95 0 0)';
-                      (e.currentTarget as HTMLElement).style.filter = 'none';
                     }}
                   >
                     <ArrowUp className="w-5 h-5" />

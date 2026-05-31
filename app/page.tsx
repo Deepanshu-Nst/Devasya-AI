@@ -24,8 +24,6 @@ export default function Home() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
-    // In a real flow, you could pass this query to local storage or query params
-    // and let the chat page auto-fill it once logged in.
     router.push('/auth');
   };
 
@@ -48,9 +46,26 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Background Ambience */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-screen relative overflow-hidden bg-[oklch(0.11_0_0)] text-foreground">
+      {/* Matte noise texture */}
+      <div className="bg-noise" />
+
+      {/* Atmospheric Depth Layering - Multi-stop gradient for vignette falloff */}
+      <div 
+        className="absolute inset-0 pointer-events-none" 
+        style={{
+          background: 'radial-gradient(circle at 50% 0%, oklch(0.65 0.20 250 / 0.08) 0%, transparent 60%)'
+        }} 
+      />
+      <div 
+        className="absolute inset-0 pointer-events-none" 
+        style={{
+          background: 'radial-gradient(ellipse at 50% 100%, oklch(0.11 0 0) 40%, transparent 100%)'
+        }} 
+      />
+
+      {/* Ambient Breathing Light */}
+      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] rounded-full blur-[140px] pointer-events-none animate-breathe" style={{ background: 'oklch(0.65 0.20 250)', opacity: 0.05 }} />
 
       {/* Navigation */}
       <nav className="relative z-50">
