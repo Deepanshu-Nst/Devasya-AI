@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, X, UploadCloud, FileText, File, Trash2, Save, AlignLeft, ChevronRight, Check, AlertCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { memoryApi, blocksApi } from '@/lib/api-client';
+import { ErrorBoundary } from '@/app/components/ErrorBoundary';
 
 const BlockEditor = dynamic(() => import('@/app/components/editor/BlockEditor'), {
   ssr: false,
@@ -451,14 +452,16 @@ export default function MemoryMode() {
                     className="text-4xl md:text-5xl font-bold bg-transparent outline-none placeholder:text-white/20 hover:bg-white/5 focus:bg-white/5 transition-colors rounded-lg px-2 py-1 -ml-2 text-foreground w-full mb-6"
                   />
                   <div className="border border-white/10 rounded-xl bg-black/20 p-4 sm:p-6 min-h-[500px] hover:border-white/20 transition-colors shadow-inner">
-                    <BlockEditor 
-                      initialContent={editContent} 
-                      onChange={(blocks) => {
-                        setEditContent(blocks);
-                        setSaveSuccess(false);
-                        setSaveError(null);
-                      }} 
-                    />
+                    <ErrorBoundary>
+                      <BlockEditor 
+                        initialContent={editContent} 
+                        onChange={(blocks) => {
+                          setEditContent(blocks);
+                          setSaveSuccess(false);
+                          setSaveError(null);
+                        }} 
+                      />
+                    </ErrorBoundary>
                   </div>
                 </MotionDiv>
               ) : (
