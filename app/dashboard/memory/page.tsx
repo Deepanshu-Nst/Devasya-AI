@@ -481,6 +481,7 @@ export default function MemoryMode() {
                     <div className="min-h-[400px]">
                       <ErrorBoundary>
                         <BlockEditor
+                          key={selectedItem.id}
                           initialContent={editContent}
                           onChange={blocks => { setEditContent(blocks); setSaveSuccess(false); setSaveError(null); }}
                         />

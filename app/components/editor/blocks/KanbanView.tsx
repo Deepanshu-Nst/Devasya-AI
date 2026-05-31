@@ -337,7 +337,7 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
               <div className="flex-1">
                 <p className="text-[11px] mb-4 text-label" style={{ color: 'oklch(0.30 0 0)' }}>Content</p>
                 <ErrorBoundary>
-                  <LightweightEditor initialContent={taskContent} onChange={handleTaskContentSave} />
+                  <LightweightEditor key={selectedTask.id} initialContent={taskContent} onChange={handleTaskContentSave} />
                 </ErrorBoundary>
               </div>
             </div>
