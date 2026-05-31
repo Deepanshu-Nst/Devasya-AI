@@ -215,7 +215,8 @@ export const blocksApi = {
   create: (data: any) => apiClient.post('/api/blocks/', data),
   update: (id: string, data: any) => apiClient.put(`/api/blocks/${id}`, data),
   delete: (id: string) => apiClient.delete(`/api/blocks/${id}`),
-  batch: (operations: any[]) => apiClient.post('/api/blocks/batch', operations)
+  batch: (operations: any[]) => apiClient.post('/api/blocks/batch', operations),
+  query: (queryParams: any) => apiClient.post('/api/blocks/query', queryParams)
 };
 
 // Query endpoints

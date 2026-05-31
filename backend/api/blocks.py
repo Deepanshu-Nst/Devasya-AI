@@ -262,3 +262,25 @@ def batch_update_blocks(
             background_tasks.add_task(_embed_block_background, uuid.UUID(block_id) if isinstance(block_id, str) else block_id, content)
 
     return {"status": "success", "processed": len(operations)}
+
+@router.post("/query", response_model=List[BlockResponse])
+def query_blocks(
+    query_params: Dict[str, Any],
+    current_user: Profile = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Query blocks across the entire workspace by type or properties.
+    query_params: {"type": "task", "limit": 100}
+    """
+    workspace_id = get_user_workspace(db, current_user.id)
+    
+    db_query = db.query(Block).filter(Block.workspace_id == workspace_id)
+    
+    if "type" in query_params:
+        db_query = db_query.filter(Block.type == query_params["type"])
+        
+    limit = query_params.get("limit", 100)
+    
+    blocks = db_query.order_by(Block.updated_at.desc()).limit(limit).all()
+    return blocks

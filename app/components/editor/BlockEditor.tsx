@@ -2,10 +2,12 @@
 
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/shadcn';
-import { Block, PartialBlock } from '@blocknote/core';
+import { Block, PartialBlock, filterSuggestionItems } from '@blocknote/core';
+import { SuggestionMenuController } from "@blocknote/react";
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/shadcn/style.css';
 import { useTheme } from 'next-themes';
+import { schema, getCustomSlashMenuItems } from './slashCommands';
 
 interface BlockEditorProps {
   initialContent?: PartialBlock[];
@@ -19,7 +21,8 @@ export default function BlockEditor({ initialContent, onChange, editable = true 
   // Initialize the editor with initial content.
   // We use useCreateBlockNote to properly manage the editor lifecycle in React.
   const editor = useCreateBlockNote({
-    initialContent: initialContent && initialContent.length > 0 ? initialContent : undefined,
+    schema,
+    initialContent: initialContent && initialContent.length > 0 ? initialContent as any : undefined,
   });
 
   return (
@@ -28,10 +31,19 @@ export default function BlockEditor({ initialContent, onChange, editable = true 
         editor={editor}
         theme={theme === 'dark' ? 'dark' : 'light'}
         editable={editable}
+        slashMenu={false}
         onChange={() => {
-          onChange(editor.document);
+          onChange(editor.document as any);
         }}
-      />
+      >
+        {/* Custom slash menu implementation */}
+        <SuggestionMenuController
+          triggerCharacter={"/"}
+          getItems={async (query) =>
+            filterSuggestionItems(getCustomSlashMenuItems(editor), query)
+          }
+        />
+      </BlockNoteView>
     </div>
   );
 }
