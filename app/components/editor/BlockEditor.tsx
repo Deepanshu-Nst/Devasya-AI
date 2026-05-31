@@ -36,21 +36,39 @@ export default function BlockEditor({ initialContent, onChange, editable = true 
       }
       return undefined;
     }
-    return blocks.map(b => {
-      const isKnown = b.type && knownTypes.has(b.type);
-      const sanitized = { ...b };
+    
+    const validBlocks = [];
+    for (const b of blocks) {
+      if (!b || typeof b !== 'object') continue;
+      
+      const isKnown = typeof b.type === 'string' && knownTypes.has(b.type);
+      const sanitized: any = { type: isKnown ? b.type : 'paragraph' };
+      
       if (!isKnown) {
-        console.warn(`Unknown or missing block type: ${b.type || 'undefined'}, converting to paragraph to prevent crash.`);
-        sanitized.type = 'paragraph';
+        console.warn(`Unknown or missing block type: ${b.type || 'undefined'}, converting to paragraph.`);
         sanitized.content = [{ type: "text", text: `[Unsupported Block Type: ${b.type || 'missing'}]`, styles: {} }];
-        sanitized.props = {}; // clear unsupported props
+        sanitized.props = {}; 
+      } else {
+        if (b.props && typeof b.props === 'object') {
+          sanitized.props = { ...b.props };
+        }
+        if (typeof b.content === 'string') {
+          sanitized.content = b.content;
+        } else if (Array.isArray(b.content)) {
+          // BlockNote default inline types: text, link
+          sanitized.content = b.content.filter((c: any) => c && typeof c === 'object' && (c.type === 'text' || c.type === 'link'));
+        }
       }
-      if (sanitized.children && Array.isArray(sanitized.children)) {
-        const sanitizedChildren = sanitizeBlocks(sanitized.children);
-        if (sanitizedChildren) sanitized.children = sanitizedChildren;
+      
+      if (b.children && Array.isArray(b.children)) {
+        const sanitizedChildren = sanitizeBlocks(b.children);
+        if (sanitizedChildren && sanitizedChildren.length > 0) {
+          sanitized.children = sanitizedChildren;
+        }
       }
-      return sanitized;
-    });
+      validBlocks.push(sanitized);
+    }
+    return validBlocks.length > 0 ? validBlocks : undefined;
   };
 
   const sanitized = sanitizeBlocks(initialContent);
