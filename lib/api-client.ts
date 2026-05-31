@@ -1,7 +1,9 @@
 import { supabase } from './supabase';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const DEFAULT_TIMEOUT_MS = 15000; // 15 seconds
+// Render free tier cold starts take 30-60s, so timeouts must be generous
+const DEFAULT_TIMEOUT_MS = 30000;  // 30s for normal requests
+const UPLOAD_TIMEOUT_MS = 120000; // 120s for file uploads (cold start + extraction + embedding)
 
 interface ApiResponse<T> {
   data?: T;
@@ -47,7 +49,7 @@ class ApiClient {
     } catch (error: any) {
       clearTimeout(id);
       if (error.name === 'AbortError') {
-        throw new Error(`Request timed out after ${timeout}ms. The server might be sleeping or under heavy load.`);
+        throw new Error(`Request timed out after ${Math.round(timeout/1000)}s. The server may be waking up — please try again.`);
       }
       throw error;
     }
@@ -108,7 +110,7 @@ class ApiClient {
     endpoint: string,
     data?: any,
     isRawFormData: boolean = false,
-    timeoutMs: number = 30000 // Uploads get longer timeout
+    timeoutMs: number = UPLOAD_TIMEOUT_MS // 120s for uploads — handles Render cold start
   ): Promise<ApiResponse<T>> {
     try {
       const url = `${this.baseUrl}${endpoint}`;

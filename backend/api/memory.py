@@ -277,23 +277,38 @@ async def upload_document(
         
         file_content = await file.read()
         
-        # 1. Try to upload to Supabase Storage (non-blocking — degrade gracefully if it fails)
+        # 1. Try to upload to Supabase Storage with strict timeout
+        # The supabase-py client has no built-in per-request timeout, so we run
+        # it in a thread and enforce a 10-second limit ourselves.
         file_url = ""
         file_path = f"{user_id}/{uuid.uuid4()}_{file.filename}"
         try:
-            res = supabase.storage.from_("documents").upload(
-                path=file_path,
-                file=file_content,
-                file_options={"content-type": file.content_type or "application/octet-stream"}
-            )
+            import concurrent.futures
+
+            def _storage_upload():
+                return supabase.storage.from_("documents").upload(
+                    path=file_path,
+                    file=file_content,
+                    file_options={"content-type": file.content_type or "application/octet-stream"}
+                )
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(_storage_upload)
+                future.result(timeout=10)  # Abort if Supabase takes > 10 s
+
             file_url = supabase.storage.from_("documents").get_public_url(file_path)
             logger.info(f"File uploaded to Supabase Storage: {file_path}")
+        except concurrent.futures.TimeoutError:
+            logger.warning(
+                "Supabase Storage upload timed out after 10 s — skipping cloud backup, "
+                "continuing with local text processing."
+            )
+            file_url = f"local://{file.filename}"
         except Exception as storage_err:
             logger.warning(
-                f"Supabase Storage upload failed (bucket may not exist or RLS policy issue): {storage_err}. "
+                f"Supabase Storage upload failed: {storage_err}. "
                 "Continuing with text extraction and embedding only."
             )
-            # Use a placeholder URL — the file content is still processed
             file_url = f"local://{file.filename}"
         
         # 2. Extract Text

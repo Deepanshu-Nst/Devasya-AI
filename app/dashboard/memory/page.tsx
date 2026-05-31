@@ -21,6 +21,7 @@ export default function MemoryMode() {
 
   // File Upload
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string>('');  // Stage message
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -140,20 +141,35 @@ export default function MemoryMode() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setIsUploading(true);
+      setUploadStatus('Waking up server...');
       setUploadError(null);
+
+      // Progressive status messages so user knows it’s working
+      const stages = [
+        { delay: 5000,  msg: 'Server is starting up (30-60s on first request)...' },
+        { delay: 20000, msg: 'Uploading and extracting text...' },
+        { delay: 50000, msg: 'Processing document chunks...' },
+      ];
+      const timers = stages.map(({ delay, msg }) =>
+        setTimeout(() => setUploadStatus(msg), delay)
+      );
+
       try {
         const res = await memoryApi.upload(file);
+        timers.forEach(clearTimeout);
         if (res.status === 200) {
+          setUploadStatus('');
           await loadMemories();
         } else {
-          // Show the actual error from the server
           const errDetail = (res.data as any)?.detail || res.error || 'Upload failed — check server logs.';
           setUploadError(errDetail);
         }
       } catch (err: any) {
+        timers.forEach(clearTimeout);
         setUploadError(err?.message || 'Network error during upload. Try again.');
       } finally {
         setIsUploading(false);
+        setUploadStatus('');
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     }
@@ -234,7 +250,14 @@ export default function MemoryMode() {
             }}
             className="w-full flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 p-1.5 rounded-md transition-colors cursor-pointer mb-2"
           >
-            {isUploading ? <span className="animate-pulse w-full text-left">Uploading...</span> : <><UploadCloud className="w-4 h-4" /> Upload Document</>}
+            {isUploading ? (
+              <span className="text-xs text-primary/80 animate-pulse w-full text-left leading-tight">
+                <UploadCloud className="w-3.5 h-3.5 inline mr-1" />
+                {uploadStatus || 'Uploading...'}
+              </span>
+            ) : (
+              <><UploadCloud className="w-4 h-4" /> Upload Document</>
+            )}
           </div>
 
           {/* Bug 6 Fix: Inline upload error instead of alert() */}
