@@ -3,7 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, X, UploadCloud, FileText, File, Trash2, Save, AlignLeft, ChevronRight, Check, AlertCircle } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { memoryApi } from '@/lib/api-client';
+
+const BlockEditor = dynamic(() => import('@/app/components/editor/BlockEditor'), {
+  ssr: false,
+  loading: () => <div className="animate-pulse bg-white/5 w-full h-[500px] rounded-lg"></div>
+});
 
 const MotionDiv = motion.div as any;
 
@@ -15,7 +21,7 @@ export default function MemoryMode() {
   // Selection & Editing
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [editTitle, setEditTitle] = useState('');
-  const [editContent, setEditContent] = useState('');
+  const [editContent, setEditContent] = useState<any[]>([]); // Now stores block array
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -55,7 +61,7 @@ export default function MemoryMode() {
     };
     setSelectedItem(newItem);
     setEditTitle('');
-    setEditContent('');
+    setEditContent([]);
     setSaveError(null);
   };
 
@@ -64,26 +70,44 @@ export default function MemoryMode() {
     setSaveError(null);
     if (item.isDocInfo) {
       setEditTitle(item.source);
-      setEditContent('Document content is split into chunks for processing. Note: Editing raw document chunks is currently limited.');
+      setEditContent([
+        {
+          type: "paragraph",
+          content: "Document content is split into chunks for processing. Note: Editing raw document chunks is currently limited."
+        }
+      ]);
     } else {
       setEditTitle(item.title || '');
-      setEditContent(item.content || '');
+      
+      // Try to parse existing content as JSON blocks. If it fails, treat as plain text.
+      let blocks = [];
+      try {
+        blocks = JSON.parse(item.content);
+        if (!Array.isArray(blocks)) throw new Error('Not an array');
+      } catch (e) {
+        blocks = item.content ? [{ type: "paragraph", content: item.content }] : [];
+      }
+      setEditContent(blocks);
     }
     setSaveSuccess(false);
   };
 
   const handleSave = async () => {
-    if (!editContent.trim()) {
+    // Check if blocks are empty
+    if (!editContent || editContent.length === 0 || (editContent.length === 1 && editContent[0].content === undefined)) {
       setSaveError('Note content cannot be empty. Please write something.');
       return;
     }
+    
+    // Convert blocks to JSON string for backend
+    const contentString = JSON.stringify(editContent);
     setIsSaving(true);
     setSaveSuccess(false);
     setSaveError(null);
 
     try {
       if (selectedItem.isNew) {
-        const res = await memoryApi.add(editContent, editTitle || undefined);
+        const res = await memoryApi.add(contentString, editTitle || undefined);
         if (res.status === 200 && res.data) {
           const newMem = res.data as any;
           // Reload full list from DB to confirm persistence
@@ -96,7 +120,7 @@ export default function MemoryMode() {
           setSaveError(res.error || 'Failed to save. Please try again.');
         }
       } else if (!selectedItem.isDocInfo) {
-        const res = await memoryApi.update(selectedItem.id, editContent, editTitle || undefined);
+        const res = await memoryApi.update(selectedItem.id, contentString, editTitle || undefined);
         if (res.status === 200 && res.data) {
           const updated = res.data as any;
           // Reload full list from DB to confirm persistence
@@ -352,15 +376,13 @@ export default function MemoryMode() {
                     placeholder="Untitled"
                     className="text-4xl md:text-5xl font-bold bg-transparent outline-none placeholder:text-white/20 text-foreground w-full"
                   />
-                  <textarea
-                    value={editContent}
-                    onChange={(e) => {
-                      setEditContent(e.target.value);
+                  <BlockEditor 
+                    initialContent={editContent} 
+                    onChange={(blocks) => {
+                      setEditContent(blocks);
                       setSaveSuccess(false);
                       setSaveError(null);
-                    }}
-                    placeholder="Press space for AI, or start typing..."
-                    className="flex-1 w-full text-base md:text-lg text-foreground/80 leading-relaxed bg-transparent outline-none resize-none placeholder:text-white/20 mt-4"
+                    }} 
                   />
                 </MotionDiv>
               ) : (

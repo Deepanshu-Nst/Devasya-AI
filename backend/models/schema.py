@@ -6,7 +6,7 @@ import uuid
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON, BigInteger
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from pgvector.sqlalchemy import Vector
 
 Base = declarative_base()
@@ -27,6 +27,7 @@ class Profile(Base):
     memory_pages = relationship("MemoryPage", back_populates="creator")
     documents = relationship("Document", back_populates="uploader")
     chat_sessions = relationship("ChatSession", back_populates="creator")
+    blocks = relationship("Block", back_populates="creator")
 
 
 class Workspace(Base):
@@ -43,6 +44,7 @@ class Workspace(Base):
     memory_pages = relationship("MemoryPage", back_populates="workspace", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="workspace", cascade="all, delete-orphan")
     chat_sessions = relationship("ChatSession", back_populates="workspace", cascade="all, delete-orphan")
+    blocks = relationship("Block", back_populates="workspace", cascade="all, delete-orphan")
 
 
 class MemoryPage(Base):
@@ -62,6 +64,29 @@ class MemoryPage(Base):
     workspace = relationship("Workspace", back_populates="memory_pages")
     creator = relationship("Profile", back_populates="memory_pages")
     chunks = relationship("DocumentChunk", back_populates="memory", cascade="all, delete-orphan")
+
+
+class Block(Base):
+    """An individual block in the workspace (page, paragraph, task, etc.)."""
+    __tablename__ = "blocks"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_id = Column(UUID(as_uuid=True), ForeignKey("blocks.id", ondelete="CASCADE"), nullable=True, index=True)
+    type = Column(String(50), nullable=False)
+    content = Column(Text, nullable=True)
+    properties = Column(JSON, default=dict)
+    position = Column(Integer, default=0) # Storing as Integer or Float; let's map REAL to Float but SQLAlchemy Float is fine
+    created_by = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    workspace = relationship("Workspace", back_populates="blocks")
+    creator = relationship("Profile", back_populates="blocks")
+    
+    # Self-referential relationship for nested blocks
+    children = relationship("Block", backref=backref('parent', remote_side=[id]), cascade="all, delete-orphan")
 
 
 class Document(Base):
