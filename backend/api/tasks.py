@@ -280,7 +280,11 @@ def update_task(
     block_updated = False
     
     if "content" in update_data:
-        block.content = update_data["content"]
+        content_data = update_data["content"]
+        if not isinstance(content_data, str):
+            import json
+            content_data = json.dumps(content_data)
+        block.content = content_data
         block_updated = True
         
     if "properties" in update_data:
