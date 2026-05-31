@@ -43,16 +43,18 @@ export default function ChatMode() {
       } catch (e) {}
     }
     
-    // Load sessions from API
-    loadSessions();
+    // Load sessions from API with a clear UI indication that the server might be cold-starting
+    setLoading(true);
+    loadSessions().finally(() => setLoading(false));
   }, []);
 
-  const loadSessions = () => {
-    queryApi.sessions().then(res => {
+  const loadSessions = async () => {
+    try {
+      const res = await queryApi.sessions();
       if (res.status === 200 && res.data) {
         setSessions((res.data as any).sessions || []);
       }
-    }).catch(() => {});
+    } catch (e) {}
   };
 
   useEffect(() => {
@@ -216,10 +218,19 @@ export default function ChatMode() {
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-1 no-scrollbar">
-          {sessions.length === 0 && (
-            <p className="text-xs text-muted-foreground px-2 py-4 text-center opacity-60">No conversations yet</p>
-          )}
-          {sessions.map(s => (
+          {loading && sessions.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center text-muted-foreground animate-pulse flex flex-col items-center">
+                <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin mb-4"></div>
+                <p className="text-sm">Waking up AI Core...</p>
+                <p className="text-xs opacity-60 mt-1">First load may take 30-60s on free tier</p>
+              </div>
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm px-4 text-center">
+              No previous threads
+            </div>
+          ) : sessions.map(s => (
              <div 
                key={s.id}
                className={`w-full group flex items-center justify-between rounded-lg transition-colors ${currentSessionId === s.id ? 'bg-white/10 text-foreground font-medium' : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'}`}

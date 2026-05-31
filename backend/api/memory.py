@@ -2,7 +2,7 @@
 Memory management endpoints for Devasya AI.
 Now uses Supabase storage, pgvector, and new SQLAlchemy schema.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks
 from sqlalchemy.orm import Session
 import logging
 import uuid
@@ -10,7 +10,7 @@ import os
 from supabase import create_client, Client
 
 from backend.config.settings import settings
-from backend.db.postgres import get_db
+from backend.db.postgres import get_db, SessionLocal
 from backend.db.vector_store import get_vector_store
 from backend.models.schema import MemoryPage, Document, Profile, Workspace, MemoryCreate, MemoryResponse, DocumentChunk
 from backend.api.auth import get_current_user
@@ -80,9 +80,28 @@ def get_user_workspace(db: Session, user_id: uuid.UUID) -> uuid.UUID:
     return workspace.id
 
 
+def _embed_memory_background(memory_id: uuid.UUID, content: str):
+    """Background task to generate embeddings for a memory page without blocking the HTTP response."""
+    try:
+        from backend.services.document_parser import chunk_text
+        chunks = chunk_text(content, chunk_size=1000, overlap=100)
+        vector_store = get_vector_store()
+        
+        # We need a fresh DB session for the background task if we need to interact with DB,
+        # but add_chunks manages its own session internally via next(get_db()), so this is safe.
+        vector_store.add_chunks(
+            chunks=chunks if chunks else [content],
+            memory_id=memory_id
+        )
+        logger.info(f"Background embedding completed for memory {memory_id}")
+    except Exception as embed_err:
+        logger.warning(f"Background embedding failed for memory {memory_id}: {embed_err}")
+
+
 @router.post("/add")
 def add_memory(
     memory_data: MemoryCreate,
+    background_tasks: BackgroundTasks,
     current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -105,18 +124,8 @@ def add_memory(
         # Serialize immediately while session is still open
         result = _serialize_memory(new_memory)
 
-        # Embed (best-effort — never blocks the save)
-        try:
-            from backend.services.document_parser import chunk_text
-            chunks = chunk_text(memory_data.content, chunk_size=1000, overlap=100)
-            vector_store = get_vector_store()
-            vector_store.add_chunks(
-                chunks=chunks if chunks else [memory_data.content],
-                memory_id=new_memory.id
-            )
-            logger.info(f"MemoryPage {new_memory.id} embedded and stored")
-        except Exception as embed_err:
-            logger.warning(f"Embedding skipped for memory {new_memory.id}: {embed_err}")
+        # Embed in the background so the UI feels instant
+        background_tasks.add_task(_embed_memory_background, new_memory.id, memory_data.content)
 
         return result
 
@@ -225,6 +234,7 @@ def get_memory(
 def update_memory(
     memory_id: str,
     memory_update: MemoryCreate,
+    background_tasks: BackgroundTasks,
     current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -262,19 +272,14 @@ def update_memory(
         # Serialize immediately
         result = _serialize_memory(memory)
 
-        # Re-embed (best-effort)
+        # Re-embed in the background
+        # First delete old chunks, then trigger background task
         try:
             db.query(DocumentChunk).filter(DocumentChunk.memory_id == memory.id).delete()
             db.commit()
-            from backend.services.document_parser import chunk_text
-            chunks = chunk_text(memory_update.content, chunk_size=1000, overlap=100)
-            vector_store = get_vector_store()
-            vector_store.add_chunks(
-                chunks=chunks if chunks else [memory_update.content],
-                memory_id=memory.id
-            )
+            background_tasks.add_task(_embed_memory_background, memory.id, memory_update.content)
         except Exception as embed_err:
-            logger.warning(f"Re-embedding skipped for memory {memory.id}: {embed_err}")
+            logger.warning(f"Failed to clear/queue re-embedding for memory {memory.id}: {embed_err}")
 
         return result
 
