@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { blocksApi } from '@/lib/api-client';
-import { Plus, GripVertical, X } from 'lucide-react';
+import { tasksApi } from '@/lib/api-client';
+import { Plus, GripVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sheet,
@@ -10,97 +10,90 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { ErrorBoundary } from '@/app/components/ErrorBoundary';
 import dynamic from 'next/dynamic';
+import useSWR from 'swr';
+import { useWorkspace } from '@/app/dashboard/layout'; // assuming this provides current workspace context
 
-const BlockEditor = dynamic(() => import('@/app/components/editor/BlockEditor'), { ssr: false });
+// Use the non-recursive LightweightEditor
+const LightweightEditor = dynamic(() => import('@/app/components/editor/LightweightEditor'), { ssr: false });
 
 interface KanbanViewProps {
-  entityType: string;
+  entityType?: string;
   statusOptions: string;
 }
 
-export default function KanbanView({ entityType, statusOptions }: KanbanViewProps) {
+export default function KanbanView({ entityType = "task", statusOptions }: KanbanViewProps) {
+  const { currentWorkspace } = useWorkspace();
   const [tasks, setTasks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [taskContent, setTaskContent] = useState<any[]>([]);
   const [savingTask, setSavingTask] = useState(false);
   const statuses = statusOptions.split(',').map(s => s.trim());
 
-  useEffect(() => {
-    loadTasks();
-  }, [entityType]);
+  // Fetch tasks
+  const { data: fetchRes, error, mutate } = useSWR(
+    currentWorkspace ? `/api/tasks?workspace_id=${currentWorkspace.id}` : null,
+    () => tasksApi.query(currentWorkspace!.id).then(r => r.data)
+  );
 
-  const loadTasks = async () => {
-    setLoading(true);
-    try {
-      const res = await blocksApi.query({ type: entityType, limit: 200 });
-      if (res.status === 200 && res.data) {
-        setTasks(res.data as any[]);
-      }
-    } catch (e) {
-      console.error("Failed to load tasks", e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (fetchRes) setTasks(fetchRes as any[]);
+  }, [fetchRes]);
 
   const handleCreateTask = async (status: string) => {
+    if (!currentWorkspace) return;
     try {
       const title = prompt("Task title:");
       if (!title) return;
       
-      const res = await blocksApi.create({
-        type: entityType,
-        properties: { 
-          title: title,
-          status: status,
-          priority: "medium"
-        }
-      });
+      const newTaskData = {
+        workspace_id: currentWorkspace.id,
+        title: title,
+        status: status,
+        priority: "medium",
+        position: tasks.filter(t => t.status === status).length * 1000,
+        content: [{ type: "paragraph", content: "" }]
+      };
+      
+      // Optimistic create
+      const tempId = `temp-${Date.now()}`;
+      setTasks(prev => [...prev, { ...newTaskData, id: tempId }]);
+      
+      const res = await tasksApi.create(newTaskData);
       
       if (res.status === 200) {
-        loadTasks();
+        mutate();
+      } else {
+        // Rollback
+        setTasks(fetchRes as any[] || []);
       }
     } catch (e) {
       console.error(e);
+      setTasks(fetchRes as any[] || []);
     }
   };
 
   const updateTaskStatus = async (taskId: string, newStatus: string) => {
     // Optimistic update
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, properties: { ...t.properties, status: newStatus } } : t));
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
     try {
-      await blocksApi.update(taskId, {
-        properties: { status: newStatus }
+      await tasksApi.update(taskId, {
+        status: newStatus
       });
-      // Optionally reload to ensure sync
+      mutate();
     } catch (e) {
       console.error(e);
-      loadTasks(); // rollback on failure
+      setTasks(fetchRes as any[] || []); // rollback on failure
     }
   };
 
   const openTask = async (task: any) => {
     setSelectedTask(task);
-    setTaskContent([]); // clear while loading
-    try {
-      const res = await blocksApi.getChildren(task.id);
-      if (res.status === 200 && res.data) {
-        const children = res.data as any[];
-        if (children.length > 0) {
-          const mappedBlocks = children.map(b => ({
-            id: b.id,
-            type: b.type,
-            props: b.properties,
-            content: b.content ? JSON.parse(b.content) : undefined,
-            children: [] 
-          }));
-          setTaskContent(mappedBlocks);
-        }
-      }
-    } catch (e) {
-      console.error(e);
+    if (task.content && Array.isArray(task.content)) {
+        setTaskContent(task.content);
+    } else {
+        setTaskContent([{ type: "paragraph", content: "No content." }]);
     }
   };
 
@@ -108,35 +101,28 @@ export default function KanbanView({ entityType, statusOptions }: KanbanViewProp
     setTaskContent(blocks);
     if (!selectedTask) return;
     
-    // Auto-save logic for task content (similar to batch save)
     setSavingTask(true);
-    const operations: any[] = [];
-    const flattenBlocks = (blocksToFlatten: any[], parentId: string, positionOffset = 0) => {
-      blocksToFlatten.forEach((b, index) => {
-        operations.push({
-          op: "update",
-          block: {
-            id: b.id,
-            type: b.type,
-            parent_id: parentId,
-            position: positionOffset + index,
-            content: b.content ? JSON.stringify(b.content) : null,
-            properties: b.props || {}
-          }
-        });
-        if (b.children && b.children.length > 0) {
-          flattenBlocks(b.children, b.id, positionOffset + index * 1000);
-        }
-      });
-    };
     
-    flattenBlocks(blocks, selectedTask.id);
-    await blocksApi.batch(operations);
-    setSavingTask(false);
+    try {
+      await tasksApi.update(selectedTask.id, {
+        content: blocks
+      });
+      // also optimistic update local task state
+      setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, content: blocks } : t));
+      mutate();
+    } catch (e) {
+      console.error("Failed to save task content", e);
+    } finally {
+      setSavingTask(false);
+    }
   };
 
-  if (loading) {
-    return <div className="p-4 text-white/50 text-sm">Loading database...</div>;
+  if (error) {
+    return <div className="p-4 text-red-400 text-sm border border-red-500/30 rounded-xl bg-red-900/10">Failed to load tasks.</div>;
+  }
+  
+  if (!fetchRes && tasks.length === 0) {
+    return <div className="p-4 text-white/50 text-sm">Loading tasks database...</div>;
   }
 
   return (
@@ -147,6 +133,7 @@ export default function KanbanView({ entityType, statusOptions }: KanbanViewProp
           className="flex-1 min-w-[250px] max-w-[350px] bg-white/5 rounded-xl border border-white/10 p-3 flex flex-col"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
+            e.preventDefault();
             const taskId = e.dataTransfer.getData("taskId");
             if (taskId) updateTaskStatus(taskId, status);
           }}
@@ -163,7 +150,9 @@ export default function KanbanView({ entityType, statusOptions }: KanbanViewProp
           
           <div className="flex-1 flex flex-col gap-2">
             <AnimatePresence>
-              {tasks.filter(t => (t.properties?.status || statuses[0]) === status).map(task => (
+              {tasks.filter(t => t.status === status)
+                .sort((a, b) => (a.position || 0) - (b.position || 0))
+                .map(task => (
                 <motion.div
                   layout
                   initial={{ opacity: 0, y: 10 }}
@@ -178,10 +167,10 @@ export default function KanbanView({ entityType, statusOptions }: KanbanViewProp
                   <div className="flex items-start gap-2">
                     <GripVertical size={16} className="text-white/20 opacity-0 group-hover:opacity-100 cursor-grab mt-0.5 -ml-1 flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="text-sm text-white/90">{task.properties?.title || 'Untitled'}</p>
-                      {task.properties?.priority && (
+                      <p className="text-sm text-white/90">{task.title || 'Untitled'}</p>
+                      {task.priority && (
                         <span className="inline-block mt-2 text-[10px] uppercase tracking-wider bg-white/10 px-2 py-0.5 rounded text-white/60">
-                          {task.properties.priority}
+                          {task.priority}
                         </span>
                       )}
                     </div>
@@ -201,24 +190,26 @@ export default function KanbanView({ entityType, statusOptions }: KanbanViewProp
               <SheetHeader className="p-6 pb-2 border-b border-white/10">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-[10px] uppercase tracking-wider bg-white/10 px-2 py-0.5 rounded text-white/60">
-                    {selectedTask.properties?.status}
+                    {selectedTask.status}
                   </span>
-                  {selectedTask.properties?.priority && (
+                  {selectedTask.priority && (
                     <span className="text-[10px] uppercase tracking-wider bg-red-500/20 text-red-400 px-2 py-0.5 rounded">
-                      {selectedTask.properties.priority}
+                      {selectedTask.priority}
                     </span>
                   )}
                   {savingTask && <span className="text-xs text-white/40 ml-auto">Saving...</span>}
                 </div>
                 <SheetTitle className="text-2xl font-bold text-white">
-                  {selectedTask.properties?.title || 'Untitled Task'}
+                  {selectedTask.title || 'Untitled Task'}
                 </SheetTitle>
               </SheetHeader>
               <div className="flex-1 p-6">
-                <BlockEditor 
-                  initialContent={taskContent} 
-                  onChange={handleTaskContentSave} 
-                />
+                <ErrorBoundary>
+                    <LightweightEditor 
+                    initialContent={taskContent} 
+                    onChange={handleTaskContentSave} 
+                    />
+                </ErrorBoundary>
               </div>
             </div>
           )}

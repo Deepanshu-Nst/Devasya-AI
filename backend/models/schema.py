@@ -3,7 +3,7 @@ SQLAlchemy models for Devasya AI database matching Supabase architecture.
 """
 from datetime import datetime
 import uuid
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, JSON, BigInteger
+from sqlalchemy import Column, Integer, Float, String, Text, DateTime, ForeignKey, Boolean, JSON, BigInteger
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
@@ -28,6 +28,7 @@ class Profile(Base):
     documents = relationship("Document", back_populates="uploader")
     chat_sessions = relationship("ChatSession", back_populates="creator")
     blocks = relationship("Block", back_populates="creator")
+    assigned_tasks = relationship("Task", back_populates="assignee")
 
 
 class Workspace(Base):
@@ -89,6 +90,30 @@ class Block(Base):
     
     # Self-referential relationship for nested blocks
     children = relationship("Block", backref=backref('parent', remote_side=[id]), cascade="all, delete-orphan")
+    task_metadata = relationship("Task", back_populates="block", uselist=False, cascade="all, delete-orphan")
+
+
+class Task(Base):
+    """Structured metadata for a task, attached to a block."""
+    __tablename__ = "tasks"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    block_id = Column(UUID(as_uuid=True), ForeignKey("blocks.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(UUID(as_uuid=True), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(100), default="Todo", nullable=False)
+    priority = Column(String(50), nullable=True)
+    due_date = Column(DateTime(timezone=True), nullable=True)
+    position = Column(Float, default=0.0, nullable=False)
+    assigned_to = Column(UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    block = relationship("Block", back_populates="task_metadata")
+    workspace = relationship("Workspace")
+    assignee = relationship("Profile", back_populates="assigned_tasks")
 
 
 class Document(Base):
