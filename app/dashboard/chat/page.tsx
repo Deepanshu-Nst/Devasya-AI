@@ -433,17 +433,14 @@ export default function ChatMode() {
                       animate={{ opacity: 1 }}
                       className="flex gap-4"
                     >
-                      <div className="shrink-0 mt-0.5">
-                        <Sparkles className="w-6 h-6 animate-pulse" style={{ color: 'oklch(0.65 0.20 250)' }} />
+                      <div className="shrink-0 mt-0.5 relative">
+                        {/* Ambient glow behind loading avatar */}
+                        <div className="absolute inset-0 bg-[oklch(0.65_0.20_250)] rounded-full blur-[8px] animate-breathe opacity-50" />
+                        <Sparkles className="w-6 h-6 animate-pulse-glow relative z-10" style={{ color: 'oklch(0.65 0.20 250)' }} />
                       </div>
-                      <div className="flex items-center gap-1.5 py-1">
-                        {[0, 150, 300].map(delay => (
-                          <div
-                            key={delay}
-                            className="w-1 h-1 rounded-full animate-bounce"
-                            style={{ background: 'oklch(0.65 0.20 250)', animationDelay: `${delay}ms` }}
-                          />
-                        ))}
+                      <div className="flex items-center py-1">
+                        {/* Blinking block cursor for intelligence feel */}
+                        <span className="animate-cursor text-[15px]" style={{ color: 'oklch(0.65 0.20 250)' }}>▍</span>
                       </div>
                     </MotionDiv>
                   )}
@@ -456,20 +453,37 @@ export default function ChatMode() {
 
         {/* ─── Minimalistic Composer ─── */}
         {hasMemory !== null && !showEmptyState && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 pb-6 bg-background">
-            <div className="max-w-3xl mx-auto flex flex-col items-center">
+          <div className="absolute bottom-0 left-0 right-0 p-4 pb-6 bg-transparent">
+            {/* Subtle gradient to obscure content behind the composer */}
+            <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to top, oklch(0.11 0 0) 60%, transparent)' }} />
+            
+            <div className="max-w-3xl mx-auto flex flex-col items-center relative z-10">
               <div
-                className="w-full flex items-end gap-3 px-4 py-2 rounded-xl transition-colors"
+                className="w-full flex items-end gap-3 px-4 py-2 rounded-xl transition-all duration-300 group"
                 style={{ background: 'oklch(0.13 0 0)' }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.boxShadow = '0 0 16px 0 oklch(0.65 0.20 250 / 0.08)';
+                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.14 0 0)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.13 0 0)';
+                }}
               >
                 <div className="flex flex-col justify-end pb-2">
                   <button
                     onClick={() => setIsDeepThinking(!isDeepThinking)}
-                    className="w-6 h-6 flex items-center justify-center transition-colors"
+                    className="w-6 h-6 flex items-center justify-center transition-all duration-300"
                     title={isDeepThinking ? "Deep Thinking: ON" : "Deep Thinking: OFF"}
                     style={{ color: isDeepThinking ? 'oklch(0.65 0.20 250)' : 'oklch(0.40 0 0)' }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.filter = 'drop-shadow(0 0 4px oklch(0.65 0.20 250 / 0.5))';
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.filter = 'none';
+                    }}
                   >
-                    {isDeepThinking ? <Brain className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+                    {isDeepThinking ? <Brain className="w-4 h-4 animate-pulse-glow" /> : <Zap className="w-4 h-4" />}
                   </button>
                 </div>
 
@@ -481,7 +495,7 @@ export default function ChatMode() {
                   disabled={loading}
                   placeholder="Ask anything..."
                   rows={1}
-                  className="flex-1 bg-transparent text-[15px] resize-none outline-none py-2 leading-relaxed disabled:opacity-50"
+                  className="flex-1 bg-transparent text-[15px] resize-none outline-none py-2 leading-relaxed disabled:opacity-50 transition-all"
                   style={{ color: 'oklch(0.95 0 0)', maxHeight: '200px' }}
                 />
 
@@ -489,8 +503,18 @@ export default function ChatMode() {
                   <button
                     onClick={() => handleSend()}
                     disabled={!input.trim() || loading}
-                    className="w-8 h-8 flex items-center justify-center transition-opacity disabled:opacity-20"
+                    className="w-8 h-8 flex items-center justify-center transition-all duration-300 disabled:opacity-20"
                     style={{ color: 'oklch(0.95 0 0)' }}
+                    onMouseEnter={e => {
+                      if (!(!input.trim() || loading)) {
+                        (e.currentTarget as HTMLElement).style.color = 'oklch(0.65 0.20 250)';
+                        (e.currentTarget as HTMLElement).style.filter = 'drop-shadow(0 0 6px oklch(0.65 0.20 250 / 0.6))';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.color = 'oklch(0.95 0 0)';
+                      (e.currentTarget as HTMLElement).style.filter = 'none';
+                    }}
                   >
                     <ArrowUp className="w-5 h-5" />
                   </button>

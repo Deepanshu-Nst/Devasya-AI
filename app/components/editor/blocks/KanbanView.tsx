@@ -252,15 +252,21 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
                       draggable
                       onDragStart={(e: any) => e.dataTransfer.setData('taskId', task.id)}
                       onClick={() => openTask(task)}
-                      className="group p-3 cursor-pointer transition-colors relative"
+                      className="group p-3 cursor-pointer transition-all duration-300 relative rounded-lg"
                       style={{ background: 'transparent' }}
-                      onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = 'oklch(0.12 0 0)')}
-                      onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLElement).style.background = 'oklch(0.12 0 0)';
+                        (e.currentTarget as HTMLElement).style.boxShadow = '0 0 12px 0 oklch(0.15 0 0 / 0.5)';
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.background = 'transparent';
+                        (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                      }}
                     >
-                      <div className="absolute left-0 top-3 bottom-3 w-[1px] opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: 'oklch(0.65 0.20 250)' }} />
+                      <div className="absolute left-0 top-3 bottom-3 w-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-full blur-[1px]" style={{ background: 'oklch(0.65 0.20 250)' }} />
                       <div className="flex items-start gap-2 pl-2">
                         <div className="flex-1 min-w-0">
-                          <p className="text-[14px] leading-snug mb-1.5" style={{ color: 'oklch(0.85 0 0)' }}>
+                          <p className="text-[14px] leading-snug mb-1.5 transition-colors duration-300 group-hover:text-[oklch(0.95_0_0)]" style={{ color: 'oklch(0.85 0 0)' }}>
                             {task.title || 'Untitled'}
                           </p>
                           {task.priority && <PriorityBadge priority={task.priority} />}
