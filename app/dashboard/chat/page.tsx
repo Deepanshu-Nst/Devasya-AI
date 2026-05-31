@@ -425,9 +425,9 @@ export default function ChatMode() {
                         )}
 
                         {/* Follow-up actions (only on AI messages) */}
-                        {msg.role === 'assistant' && msg.actions && msg.actions.length > 0 && (
+                        {m.role === 'assistant' && m.actions && m.actions.length > 0 && (
                           <div className="mt-6 flex flex-wrap gap-2">
-                            {msg.actions.map(action => (
+                            {m.actions.map((action: string) => (
                               <button
                                 key={action}
                                 onClick={() => handleActionClick(action)}
