@@ -66,6 +66,7 @@ class ApiClient {
       const options: RequestInit = {
         method,
         headers: await this.getHeaders(),
+        cache: 'no-store', // Prevent browser/Next.js from caching list responses
       };
 
       if (data) {
