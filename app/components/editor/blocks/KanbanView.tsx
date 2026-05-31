@@ -14,6 +14,7 @@ import { ErrorBoundary } from '@/app/components/ErrorBoundary';
 import dynamic from 'next/dynamic';
 import useSWR from 'swr';
 
+const MotionDiv = motion.div as any;
 
 // Use the non-recursive LightweightEditor
 const LightweightEditor = dynamic(() => import('@/app/components/editor/LightweightEditor'), { ssr: false });
@@ -157,16 +158,14 @@ export default function KanbanView({ entityType = "task", statusOptions }: Kanba
               {tasks.filter(t => t.status === status)
                 .sort((a, b) => (a.position || 0) - (b.position || 0))
                 .map(task => (
-                <motion.div
+                <MotionDiv
                   layout
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   key={task.id}
-                  {...({ 
-                    draggable: true, 
-                    onDragStart: (e: any) => e.dataTransfer.setData("taskId", task.id) 
-                  } as any)}
+                  draggable={true}
+                  onDragStart={(e: any) => e.dataTransfer.setData("taskId", task.id)}
                   className="bg-black/40 border border-white/5 rounded-lg p-3 cursor-pointer hover:border-white/20 transition-all group"
                   onClick={() => openTask(task)}
                 >
@@ -181,7 +180,7 @@ export default function KanbanView({ entityType = "task", statusOptions }: Kanba
                       )}
                     </div>
                   </div>
-                </motion.div>
+                </MotionDiv>
               ))}
             </AnimatePresence>
           </div>
