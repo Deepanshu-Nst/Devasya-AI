@@ -106,7 +106,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(memory.router)
 app.include_router(query.router)
-app.include_router(blocks.router, prefix="/api/blocks", tags=["blocks"])
+app.include_router(blocks.router)
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 app.include_router(mcp_router)
 

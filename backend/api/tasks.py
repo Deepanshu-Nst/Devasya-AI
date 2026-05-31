@@ -107,6 +107,35 @@ def get_tasks(
     return result
 
 
+@router.post("/test-task-db")
+def test_task_db(
+    db: Session = Depends(get_db),
+    current_user: Profile = Depends(get_current_user)
+):
+    try:
+        workspace_id = get_user_workspace(db, current_user.id)
+        new_block = Block(
+            workspace_id=workspace_id,
+            type="task",
+            content="test",
+            created_by=current_user.id
+        )
+        db.add(new_block)
+        db.flush()
+        
+        new_task = Task(
+            block_id=new_block.id,
+            workspace_id=workspace_id,
+            status="Todo"
+        )
+        db.add(new_task)
+        db.commit()
+        return {"status": "success", "task_id": new_task.id}
+    except Exception as e:
+        import traceback
+        db.rollback()
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+
 @router.post("/tasks", response_model=TaskResponse)
 def create_task(
     task_data: TaskCreate,
@@ -131,30 +160,35 @@ def create_task(
     if task_data.content is not None:
         content_str = json.dumps(task_data.content) if not isinstance(task_data.content, str) else task_data.content
 
-    new_block = Block(
-        workspace_id=workspace_id,
-        type="task",
-        content=content_str,
-        properties=props,
-        created_by=current_user.id
-    )
-    db.add(new_block)
-    db.flush() # Get block ID
-    
-    # 2. Create task metadata
-    new_task = Task(
-        block_id=new_block.id,
-        workspace_id=workspace_id,
-        status=task_data.status,
-        priority=task_data.priority,
-        due_date=task_data.due_date,
-        position=task_data.position,
-        assigned_to=task_data.assigned_to
-    )
-    db.add(new_task)
-    db.commit()
-    db.refresh(new_task)
-    db.refresh(new_block)
+    try:
+        new_block = Block(
+            workspace_id=workspace_id,
+            type="task",
+            content=content_str,
+            properties=props,
+            created_by=current_user.id
+        )
+        db.add(new_block)
+        db.flush() # Get block ID
+        
+        # 2. Create task metadata
+        new_task = Task(
+            block_id=new_block.id,
+            workspace_id=workspace_id,
+            status=task_data.status,
+            priority=task_data.priority,
+            due_date=task_data.due_date,
+            position=task_data.position,
+            assigned_to=task_data.assigned_to
+        )
+        db.add(new_task)
+        db.commit()
+        db.refresh(new_task)
+        db.refresh(new_block)
+    except Exception as e:
+        import traceback
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)} | Trace: {traceback.format_exc()}")
     
     # Trigger vector index update asynchronously here
     # (To be integrated with vector_store)
@@ -184,6 +218,14 @@ def create_task(
         import logging
         logging.warning(f"Failed to update vector index for task {new_task.id}: {e}")
         
+    import json
+    parsed_content = new_block.content
+    if parsed_content and isinstance(parsed_content, str):
+        try:
+            parsed_content = json.loads(parsed_content)
+        except:
+            pass
+
     return {
         "id": new_task.id,
         "block_id": new_task.block_id,
@@ -196,7 +238,7 @@ def create_task(
         "created_at": new_task.created_at,
         "updated_at": new_task.updated_at,
         "title": task_data.title,
-        "content": new_block.content,
+        "content": parsed_content,
         "properties": new_block.properties
     }
 
