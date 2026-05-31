@@ -8,16 +8,18 @@ export const AiBlock = createReactBlockSpec(
     type: "ai",
     propSchema: {
       action: {
-        default: "custom",
+        default: "custom" as const,
+        values: ["custom", "summarize", "extract_tasks", "rewrite", "continue_writing"] as const,
       },
       prompt: {
-        default: "",
+        default: "_" as const,
       },
       status: {
-        default: "input", // input, generating, done, error
+        default: "input" as const,
+        values: ["input", "generating", "done", "error"] as const,
       },
       generatedText: {
-        default: "",
+        default: "_" as const,
       }
     },
     content: "none",
