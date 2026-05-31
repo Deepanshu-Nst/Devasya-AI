@@ -13,7 +13,7 @@ import {
 import { ErrorBoundary } from '@/app/components/ErrorBoundary';
 import dynamic from 'next/dynamic';
 import useSWR from 'swr';
-import { useWorkspace } from '@/app/dashboard/layout'; // assuming this provides current workspace context
+
 
 // Use the non-recursive LightweightEditor
 const LightweightEditor = dynamic(() => import('@/app/components/editor/LightweightEditor'), { ssr: false });
@@ -24,7 +24,6 @@ interface KanbanViewProps {
 }
 
 export default function KanbanView({ entityType = "task", statusOptions }: KanbanViewProps) {
-  const { currentWorkspace } = useWorkspace();
   const [tasks, setTasks] = useState<any[]>([]);
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [taskContent, setTaskContent] = useState<any[]>([]);
@@ -33,8 +32,8 @@ export default function KanbanView({ entityType = "task", statusOptions }: Kanba
 
   // Fetch tasks
   const { data: fetchRes, error, mutate } = useSWR(
-    currentWorkspace ? `/api/tasks?workspace_id=${currentWorkspace.id}` : null,
-    () => tasksApi.query(currentWorkspace!.id).then(r => r.data)
+    '/api/tasks',
+    () => tasksApi.query('').then(r => r.data)
   );
 
   useEffect(() => {
@@ -42,13 +41,11 @@ export default function KanbanView({ entityType = "task", statusOptions }: Kanba
   }, [fetchRes]);
 
   const handleCreateTask = async (status: string) => {
-    if (!currentWorkspace) return;
     try {
       const title = prompt("Task title:");
       if (!title) return;
       
       const newTaskData = {
-        workspace_id: currentWorkspace.id,
         title: title,
         status: status,
         priority: "medium",

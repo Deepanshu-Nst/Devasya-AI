@@ -7,6 +7,7 @@ from datetime import datetime
 
 from backend.db.postgres import get_db
 from backend.api.auth import get_current_user
+from backend.api.memory import get_user_workspace
 from backend.models.schema import Task, Block, Profile, Workspace
 
 router = APIRouter()
@@ -23,7 +24,7 @@ class TaskCreate(TaskBase):
     title: str = Field(..., description="The title of the task")
     content: Optional[Any] = Field(None, description="BlockNote JSON content")
     properties: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    workspace_id: uuid.UUID
+    workspace_id: Optional[uuid.UUID] = None
     
 class TaskUpdate(BaseModel):
     status: Optional[str] = None
@@ -52,13 +53,16 @@ class TaskResponse(TaskBase):
 
 @router.get("/tasks", response_model=List[TaskResponse])
 def get_tasks(
-    workspace_id: uuid.UUID,
+    workspace_id: Optional[uuid.UUID] = None,
     status: Optional[str] = None,
     limit: int = 100,
     db: Session = Depends(get_db),
     current_user: Profile = Depends(get_current_user)
 ):
     """Get all active tasks in a workspace"""
+    if not workspace_id:
+        workspace_id = get_user_workspace(db, current_user.id)
+        
     # Verify workspace access
     workspace = db.query(Workspace).filter(Workspace.id == workspace_id, Workspace.owner_id == current_user.id).first()
     if not workspace:
@@ -110,8 +114,12 @@ def create_task(
     current_user: Profile = Depends(get_current_user)
 ):
     """Create a new task (creates both a block and task metadata)"""
+    workspace_id = task_data.workspace_id
+    if not workspace_id:
+        workspace_id = get_user_workspace(db, current_user.id)
+        
     # Verify workspace access
-    workspace = db.query(Workspace).filter(Workspace.id == task_data.workspace_id, Workspace.owner_id == current_user.id).first()
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id, Workspace.owner_id == current_user.id).first()
     if not workspace:
         raise HTTPException(status_code=403, detail="Not authorized to access this workspace")
         
@@ -120,7 +128,7 @@ def create_task(
     props['title'] = task_data.title
     
     new_block = Block(
-        workspace_id=task_data.workspace_id,
+        workspace_id=workspace_id,
         type="task",
         content=task_data.content,
         properties=props,
@@ -132,7 +140,7 @@ def create_task(
     # 2. Create task metadata
     new_task = Task(
         block_id=new_block.id,
-        workspace_id=task_data.workspace_id,
+        workspace_id=workspace_id,
         status=task_data.status,
         priority=task_data.priority,
         due_date=task_data.due_date,
@@ -162,11 +170,11 @@ def create_task(
                 "text": text_to_embed,
                 "metadata": {
                     "type": "task",
-                    "workspace_id": str(task_data.workspace_id),
+                    "workspace_id": str(workspace_id),
                     "status": task_data.status
                 }
             }],
-            workspace_id=str(task_data.workspace_id)
+            workspace_id=str(workspace_id)
         )
     except Exception as e:
         import logging
