@@ -183,7 +183,22 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
   }
 
   if (!fetchRes && tasks.length === 0) {
-    return <div className="text-[13px]" style={{ color: 'oklch(0.40 0 0)' }}>Loading tasks...</div>;
+    return (
+      <div className="flex gap-12 overflow-x-auto h-full styled-scrollbar pr-12 pl-6 pt-6 pb-12 pointer-events-none">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex-1 min-w-[280px] max-w-[340px] flex flex-col p-4 opacity-40">
+            <div className="pb-4 border-t border-[oklch(0.20_0_0_/_0.3)] pt-3 mb-4">
+              <div className="w-1/2 h-3 ambient-skeleton-subtle" />
+            </div>
+            <div className="space-y-4">
+              <div className="w-full h-20 ambient-skeleton rounded-xl" />
+              <div className="w-full h-16 ambient-skeleton rounded-xl" />
+              <div className="w-5/6 h-24 ambient-skeleton rounded-xl" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -200,7 +215,7 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
           return (
             <div
               key={status}
-              className="flex-1 min-w-[280px] max-w-[340px] flex flex-col transition-all duration-300 rounded-2xl p-4"
+              className="flex-1 min-w-[280px] max-w-[340px] flex flex-col transition-all duration-300 rounded-xl p-4"
               style={{
                 background: isDragOver ? 'oklch(0.12 0 0)' : 'transparent',
               }}
@@ -213,15 +228,15 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
                 if (taskId) updateTaskStatus(taskId, status);
               }}
             >
-              {/* Minimal Column Header */}
-              <div className="pb-4 flex items-center gap-3 shrink-0">
+              {/* Minimal Column Header with top rail */}
+              <div className="pb-4 pt-3 flex items-center gap-3 shrink-0 border-t border-[oklch(0.20_0_0_/_0.5)]">
                 <StatusIcon className="w-4 h-4 shrink-0" style={{ color: config.color }} />
-                <span className="text-[13px] font-medium tracking-wide flex-1" style={{ color: 'oklch(0.60 0 0)' }}>
-                  {status} <span className="opacity-40 font-normal ml-1">({columnTasks.length})</span>
+                <span className="text-[13px] font-semibold tracking-wider uppercase flex-1" style={{ color: 'oklch(0.50 0 0)' }}>
+                  {status} <span className="opacity-40 font-normal ml-1 normal-case text-[12px]">({columnTasks.length})</span>
                 </span>
                 <button
                   onClick={() => setCreatingInColumn(status)}
-                  className="w-6 h-6 flex items-center justify-center transition-colors rounded-full"
+                  className="w-6 h-6 flex items-center justify-center transition-all duration-150 rounded-full"
                   style={{ color: 'oklch(0.40 0 0)' }}
                   onMouseEnter={e => {
                     (e.currentTarget as HTMLElement).style.color = 'oklch(0.95 0 0)';
@@ -237,7 +252,7 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
               </div>
 
               {/* Column body */}
-              <div className="flex-1 overflow-y-auto pt-2 space-y-4 no-scrollbar">
+              <div className="flex-1 overflow-y-auto pt-2 space-y-4 no-scrollbar min-h-[150px]">
                 <AnimatePresence>
                   {creatingInColumn === status && (
                     <InlineCreateInput
@@ -258,18 +273,18 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
                       draggable
                       onDragStart={(e: any) => e.dataTransfer.setData('taskId', task.id)}
                       onClick={() => openTask(task)}
-                      className="group p-3 cursor-pointer transition-all duration-300 relative rounded-lg"
-                      style={{ background: 'transparent' }}
+                      className="group p-3.5 cursor-pointer transition-all duration-150 relative rounded-xl"
+                      style={{ background: 'oklch(0.13 0 0)' }}
                       onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.background = 'oklch(0.12 0 0)';
-                        (e.currentTarget as HTMLElement).style.boxShadow = '0 0 12px 0 oklch(0.15 0 0 / 0.5)';
+                        (e.currentTarget as HTMLElement).style.background = 'oklch(0.16 0 0)';
+                        (e.currentTarget as HTMLElement).style.boxShadow = '0 0 16px 0 oklch(0.15 0 0 / 0.5)';
                       }}
                       onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.background = 'transparent';
+                        (e.currentTarget as HTMLElement).style.background = 'oklch(0.13 0 0)';
                         (e.currentTarget as HTMLElement).style.boxShadow = 'none';
                       }}
                     >
-                      <div className="absolute left-0 top-3 bottom-3 w-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-full blur-[1px]" style={{ background: 'oklch(0.65 0.20 250)' }} />
+                      <div className="absolute left-0 top-3 bottom-3 w-[2px] opacity-0 group-hover:opacity-100 transition-all duration-150 rounded-full blur-[1px]" style={{ background: 'oklch(0.65 0.20 250)' }} />
                       <div className="flex items-start gap-2 pl-2">
                         <div className="flex-1 min-w-0">
                           <p className="text-[14px] leading-snug mb-1.5 transition-colors duration-300 group-hover:text-[oklch(0.95_0_0)]" style={{ color: 'oklch(0.85 0 0)' }}>

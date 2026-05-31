@@ -307,32 +307,31 @@ export default function MemoryMode() {
     return (
       <button
         onClick={() => handleSelect(item)}
-        className="w-full group flex items-center gap-3 px-4 py-2.5 text-left transition-all duration-200 ease-out relative"
-        style={{ color: isActive ? 'oklch(0.95 0 0)' : 'oklch(0.50 0 0)' }}
+        className="w-full group flex items-center gap-3 px-3 py-2 text-left transition-all duration-150 rounded-lg relative"
+        style={{ 
+          color: isActive ? 'oklch(0.95 0 0)' : 'oklch(0.50 0 0)',
+          background: isActive ? 'oklch(0.14 0 0)' : 'transparent' 
+        }}
         onMouseEnter={e => {
           if (!isActive) {
+            (e.currentTarget as HTMLElement).style.background = 'oklch(0.11 0 0)';
             (e.currentTarget as HTMLElement).style.color = 'oklch(0.85 0 0)';
           }
         }}
         onMouseLeave={e => {
           if (!isActive) {
+            (e.currentTarget as HTMLElement).style.background = 'transparent';
             (e.currentTarget as HTMLElement).style.color = 'oklch(0.50 0 0)';
           }
         }}
       >
-        {isActive && (
-          <span 
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 rounded-full blur-[4px]" 
-            style={{ background: 'oklch(0.65 0.20 250)', opacity: 0.6 }} 
-          />
-        )}
         {item.isDocInfo ? (
-          <FileText className={`w-3.5 h-3.5 shrink-0 transition-all duration-200 ease-out ${isActive ? 'opacity-100 animate-pulse-glow' : 'opacity-40'}`} />
+          <FileText className={`w-3.5 h-3.5 shrink-0 transition-all duration-150 ${isActive ? 'opacity-100 animate-pulse-glow text-[oklch(0.65_0.20_250)]' : 'opacity-40 text-inherit'}`} />
         ) : (
-          <AlignLeft className={`w-3.5 h-3.5 shrink-0 transition-all duration-200 ease-out ${isActive ? 'opacity-100 animate-pulse-glow' : 'opacity-40'}`} />
+          <AlignLeft className={`w-3.5 h-3.5 shrink-0 transition-all duration-150 ${isActive ? 'opacity-100 animate-pulse-glow text-[oklch(0.65_0.20_250)]' : 'opacity-40 text-inherit'}`} />
         )}
-        <span className="text-[14px] truncate flex-1 leading-relaxed">{item.isDocInfo ? item.source : item.title || 'Untitled'}</span>
-        <span className="text-[11px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0 font-mono" style={{ color: 'oklch(0.35 0 0)' }}>
+        <span className="text-[13px] truncate flex-1 leading-relaxed font-medium tracking-wide">{item.isDocInfo ? item.source : item.title || 'Untitled'}</span>
+        <span className="text-[10px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 shrink-0 font-mono tracking-widest" style={{ color: 'oklch(0.35 0 0)' }}>
           {formatRelativeDate(item.created_at)}
         </span>
       </button>
@@ -393,23 +392,28 @@ export default function MemoryMode() {
         {/* Page list */}
         <div className="flex-1 overflow-y-auto no-scrollbar">
           {loading ? (
-            <div className="text-[12px]" style={{ color: 'oklch(0.40 0 0)' }}>Loading...</div>
+            <div className="space-y-4 px-2 mt-4">
+              <div className="h-2 w-1/3 ambient-skeleton-subtle" />
+              <div className="h-6 w-full ambient-skeleton rounded-lg opacity-40" />
+              <div className="h-6 w-full ambient-skeleton rounded-lg opacity-40" />
+              <div className="h-6 w-3/4 ambient-skeleton rounded-lg opacity-40" />
+            </div>
           ) : filteredItems.length === 0 ? (
-            <div className="text-[12px]" style={{ color: 'oklch(0.40 0 0)' }}>No context items.</div>
+            <div className="text-[12px] px-2" style={{ color: 'oklch(0.40 0 0)' }}>No context items.</div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-10 px-2 mt-2">
               {noteItems.length > 0 && (
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'oklch(0.30 0 0)' }}>Notes</div>
-                  <div className="space-y-0.5 -ml-3">
+                  <div className="text-[10px] font-bold uppercase tracking-widest mb-3 pl-3" style={{ color: 'oklch(0.30 0 0)' }}>Notes</div>
+                  <div className="space-y-0.5">
                     {noteItems.map(item => <PageItem key={item.id} item={item} />)}
                   </div>
                 </div>
               )}
               {docItems.length > 0 && (
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-widest mb-2" style={{ color: 'oklch(0.30 0 0)' }}>Documents</div>
-                  <div className="space-y-0.5 -ml-3">
+                  <div className="text-[10px] font-bold uppercase tracking-widest mb-3 pl-3" style={{ color: 'oklch(0.30 0 0)' }}>Documents</div>
+                  <div className="space-y-0.5">
                     {docItems.map(item => <PageItem key={item.id} item={item} />)}
                   </div>
                 </div>
@@ -488,11 +492,17 @@ export default function MemoryMode() {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 opacity-40">
-            <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
-              <BookOpen className="w-8 h-8 mx-auto mb-4" style={{ color: 'oklch(0.30 0 0)' }} />
-              <p className="text-[14px] uppercase tracking-widest font-semibold mb-2" style={{ color: 'oklch(0.50 0 0)' }}>Knowledge Base</p>
-              <p className="text-[13px]" style={{ color: 'oklch(0.30 0 0)' }}>Select a context file to preview.</p>
+          <div className="flex-1 relative flex flex-col items-end justify-end p-12 md:p-24 overflow-hidden">
+            {/* Archival Background Grid & Faint Glow */}
+            <div className="absolute inset-0 archival-grid opacity-[0.015] pointer-events-none" />
+            <div className="absolute right-[-10%] bottom-[-10%] w-[800px] h-[800px] rounded-full blur-[120px] pointer-events-none opacity-20" style={{ background: 'oklch(0.65 0.20 250 / 0.05)' }} />
+            
+            <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }} className="text-right max-w-sm relative z-10 opacity-30">
+              <h2 className="text-5xl font-semibold tracking-tighter mb-4 uppercase" style={{ color: 'oklch(0.50 0 0)' }}>Archive</h2>
+              <div className="w-12 h-1 ml-auto mb-6" style={{ background: 'oklch(0.20 0 0)' }} />
+              <p className="text-[14px] leading-relaxed font-medium" style={{ color: 'oklch(0.40 0 0)' }}>
+                System ready. Select a document or note from the left to access context.
+              </p>
             </MotionDiv>
           </div>
         )}

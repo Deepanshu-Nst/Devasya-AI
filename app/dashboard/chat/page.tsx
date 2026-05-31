@@ -335,54 +335,63 @@ export default function ChatMode() {
                   </div>
                 </MotionDiv>
               ) : (
-                <MotionDiv key="chat" className="space-y-10">
-                  {messages.length === 0 && (
-                    <div className="pt-20 pb-8 opacity-40">
-                      <Sparkles className="w-5 h-5 mb-4" />
-                      <p className="text-[15px]">Ready.</p>
-                    </div>
-                  )}
-
+                <MotionDiv
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.6 }}
+                  className="flex flex-col space-y-20"
+                >
                   {messages.map((m, idx) => (
                     <MotionDiv
                       key={idx}
-                      initial={{ opacity: 0, y: 4 }}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.15 }}
-                      className="flex gap-4"
+                      className="flex gap-5"
                     >
                       {/* Avatar */}
-                      <div className="shrink-0 mt-0.5">
+                      <div className="shrink-0 mt-1">
                         {m.role === 'user' ? (
-                          <div className="w-6 h-6 flex items-center justify-center rounded bg-background" style={{ border: '1px solid oklch(0.25 0 0)' }}>
-                            <span className="text-[10px] font-mono" style={{ color: 'oklch(0.60 0 0)' }}>U</span>
+                          <div className="w-6 h-6 flex items-center justify-center rounded" style={{ background: 'oklch(0.20 0 0)' }}>
+                            <User className="w-3.5 h-3.5" style={{ color: 'oklch(0.70 0 0)' }} />
                           </div>
                         ) : (
-                          <Sparkles className="w-6 h-6" style={{ color: 'oklch(0.65 0.20 250)' }} />
+                          <>
+                            {idx === messages.length - 1 && loading && (
+                              <div className="absolute inset-0 bg-[oklch(0.65_0.20_250)] rounded-full blur-[8px] animate-breathe opacity-50 pointer-events-none" />
+                            )}
+                            <Sparkles 
+                              className={`w-6 h-6 relative z-10 ${idx === messages.length - 1 && loading ? 'animate-pulse-glow' : ''}`} 
+                              style={{ color: 'oklch(0.65 0.20 250)' }} 
+                            />
+                          </>
                         )}
                       </div>
 
                       {/* Content — completely borderless, letting typography breathe */}
-                      <div className="flex-1 min-w-0 flex flex-col gap-3">
+                      <div className="flex-1 min-w-0 flex flex-col gap-4 pt-0.5">
                         <div
-                          className="leading-relaxed text-[15px] whitespace-pre-wrap"
+                          className="leading-relaxed text-[15px] whitespace-pre-wrap font-medium max-w-[65ch]"
                           style={{ color: m.role === 'user' ? 'oklch(0.95 0 0)' : 'oklch(0.85 0 0)' }}
                         >
                           {m.content}
+                          {m.role === 'assistant' && loading && idx === messages.length - 1 && (
+                            <span className="animate-cursor ml-1 text-[15px]" style={{ color: 'oklch(0.65 0.20 250)' }}>▍</span>
+                          )}
                         </div>
 
                         {/* Reasoning block */}
                         {m.role === 'assistant' && (m.connections || m.actions || (m.context && m.context.length > 0)) && (
-                          <div>
+                          <div className="max-w-[65ch]">
                             <button
                               onClick={() => toggleThinking(idx)}
-                              className="flex items-center gap-1.5 text-[12px] transition-colors"
+                              className="flex items-center gap-1.5 text-[12px] transition-colors duration-150"
                               style={{ color: 'oklch(0.40 0 0)' }}
                               onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = 'oklch(0.65 0.20 250)')}
                               onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'oklch(0.40 0 0)')}
                             >
                               <ChevronDown
-                                className={`w-3.5 h-3.5 transition-transform ${expandedThinking.includes(idx) ? 'rotate-180' : ''}`}
+                                className={`w-3.5 h-3.5 transition-transform duration-150 ${expandedThinking.includes(idx) ? 'rotate-180' : ''}`}
                               />
                               {expandedThinking.includes(idx) ? 'Hide reasoning' : 'Show reasoning'}
                             </button>
@@ -393,7 +402,7 @@ export default function ChatMode() {
                                   initial={{ opacity: 0, height: 0 }}
                                   animate={{ opacity: 1, height: 'auto' }}
                                   exit={{ opacity: 0, height: 0 }}
-                                  className="overflow-hidden mt-3"
+                                  className="overflow-hidden mt-4"
                                 >
                                   <div
                                     className="pl-4 space-y-4 py-2"
@@ -407,13 +416,13 @@ export default function ChatMode() {
                                     )}
                                     {m.connections && (
                                       <div>
-                                        <div className="text-[11px] font-mono mb-1" style={{ color: 'oklch(0.35 0 0)' }}>[INSIGHT]</div>
+                                        <div className="text-[11px] font-mono mb-1.5" style={{ color: 'oklch(0.35 0 0)' }}>[INSIGHT]</div>
                                         <p className="text-[13px] leading-relaxed" style={{ color: 'oklch(0.60 0 0)' }}>{m.connections}</p>
                                       </div>
                                     )}
                                     {m.actions && (
                                       <div>
-                                        <div className="text-[11px] font-mono mb-1" style={{ color: 'oklch(0.35 0 0)' }}>[ACTION]</div>
+                                        <div className="text-[11px] font-mono mb-1.5" style={{ color: 'oklch(0.35 0 0)' }}>[ACTION]</div>
                                         <p className="text-[13px] leading-relaxed" style={{ color: 'oklch(0.60 0 0)' }}>{m.actions}</p>
                                       </div>
                                     )}
@@ -426,27 +435,27 @@ export default function ChatMode() {
 
                         {/* Follow-up actions (only on AI messages) */}
                         {m.role === 'assistant' && m.actions && m.actions.length > 0 && (
-                          <div className="mt-6 flex flex-wrap gap-2">
+                          <div className="mt-8 flex flex-wrap gap-2 max-w-[65ch]">
                             {m.actions.map((action: string) => (
                               <button
                                 key={action}
                                 onClick={() => handleActionClick(action)}
                                 disabled={loading}
-                                className="px-3 py-1.5 text-[12px] font-medium border rounded-md transition-all duration-200 ease-out disabled:opacity-50"
+                                className="px-3 py-1.5 text-[12px] font-medium border rounded-md transition-all duration-150 disabled:opacity-50"
                                 style={{
-                                  borderColor: 'oklch(0.20 0 0)',
-                                  color: 'oklch(0.65 0 0)',
+                                  borderColor: 'oklch(0.18 0 0)',
+                                  color: 'oklch(0.55 0 0)',
                                 }}
                                 onMouseEnter={e => {
                                   if (!loading) {
-                                    (e.currentTarget as HTMLElement).style.borderColor = 'oklch(0.65 0.20 250 / 0.5)';
+                                    (e.currentTarget as HTMLElement).style.borderColor = 'oklch(0.65 0.20 250 / 0.4)';
                                     (e.currentTarget as HTMLElement).style.color = 'oklch(0.65 0.20 250)';
                                   }
                                 }}
                                 onMouseLeave={e => {
                                   if (!loading) {
-                                    (e.currentTarget as HTMLElement).style.borderColor = 'oklch(0.20 0 0)';
-                                    (e.currentTarget as HTMLElement).style.color = 'oklch(0.65 0 0)';
+                                    (e.currentTarget as HTMLElement).style.borderColor = 'oklch(0.18 0 0)';
+                                    (e.currentTarget as HTMLElement).style.color = 'oklch(0.55 0 0)';
                                   }
                                 }}
                               >
@@ -467,10 +476,10 @@ export default function ChatMode() {
                       className="flex gap-5"
                     >
                       <div className="shrink-0 mt-1 relative">
-                        <div className="absolute inset-0 bg-[oklch(0.65_0.20_250)] rounded-full blur-[8px] animate-breathe opacity-50" />
+                        <div className="absolute inset-0 bg-[oklch(0.65_0.20_250)] rounded-full blur-[8px] animate-breathe opacity-50 pointer-events-none" />
                         <Sparkles className="w-6 h-6 animate-pulse-glow relative z-10" style={{ color: 'oklch(0.65 0.20 250)' }} />
                       </div>
-                      <div className="flex-1 space-y-3 pt-2">
+                      <div className="flex-1 space-y-3 pt-2 max-w-[65ch]">
                         <div className="h-2 w-2/3 ambient-skeleton" />
                         <div className="h-2 w-1/2 ambient-skeleton-subtle" />
                         <div className="h-2 w-5/6 ambient-skeleton" />
@@ -484,34 +493,39 @@ export default function ChatMode() {
           </div>
         </div>
 
-        {/* ─── Minimalistic Composer ─── */}
+        {/* ─── Composer (Dark Glass in Darkness) ─── */}
         {hasMemory !== null && !showEmptyState && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 pb-6 bg-transparent">
-            {/* Subtle gradient to obscure content behind the composer */}
-            <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to top, oklch(0.11 0 0) 60%, transparent)' }} />
+          <div className="absolute bottom-0 left-0 right-0 px-4 pb-6 pt-16 bg-transparent">
+            {/* Subtle gradient to obscure content behind the composer, but deeply feathered */}
+            <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to top, oklch(0.11 0 0) 40%, transparent)' }} />
             
             <div className="max-w-2xl mx-auto flex flex-col items-center relative z-10">
               <div
-                className="w-full flex items-end gap-3 px-4 py-2 transition-all duration-200 ease-out group border-b border-transparent"
-                style={{ background: 'transparent' }}
+                className="w-full flex items-end gap-3 px-5 py-3 transition-all duration-300 group rounded-2xl"
+                style={{ 
+                  background: 'oklch(0.13 0 0 / 0.5)',
+                  borderTop: '1px solid oklch(0.95 0 0 / 0.03)',
+                  boxShadow: 'inset 0 1px 0 oklch(0.95 0 0 / 0.02), 0 -8px 24px -8px rgba(0,0,0,0.4)',
+                  backdropFilter: 'blur(16px)'
+                }}
                 onFocus={e => {
-                  (e.currentTarget as HTMLElement).style.borderBottomColor = 'oklch(0.65 0.20 250 / 0.3)';
+                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.14 0 0 / 0.7)';
                 }}
                 onBlur={e => {
-                  (e.currentTarget as HTMLElement).style.borderBottomColor = 'transparent';
+                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.13 0 0 / 0.5)';
                 }}
               >
                 <div className="flex flex-col justify-end pb-2">
                   <button
                     onClick={() => setIsDeepThinking(!isDeepThinking)}
-                    className="w-6 h-6 flex items-center justify-center transition-all duration-200 ease-out"
+                    className="w-6 h-6 flex items-center justify-center transition-all duration-150 rounded-full"
                     title={isDeepThinking ? "Deep Thinking: ON" : "Deep Thinking: OFF"}
                     style={{ color: isDeepThinking ? 'oklch(0.65 0.20 250)' : 'oklch(0.40 0 0)' }}
                     onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.filter = 'drop-shadow(0 0 4px oklch(0.65 0.20 250 / 0.5))';
+                      (e.currentTarget as HTMLElement).style.color = 'oklch(0.65 0.20 250)';
                     }}
                     onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.filter = 'none';
+                      (e.currentTarget as HTMLElement).style.color = isDeepThinking ? 'oklch(0.65 0.20 250)' : 'oklch(0.40 0 0)';
                     }}
                   >
                     {isDeepThinking ? <Brain className="w-4 h-4 animate-pulse-glow" /> : <Zap className="w-4 h-4" />}
@@ -526,15 +540,15 @@ export default function ChatMode() {
                   disabled={loading}
                   placeholder="Ask anything..."
                   rows={1}
-                  className="flex-1 bg-transparent text-[15px] resize-none outline-none py-2 leading-relaxed disabled:opacity-50 transition-all"
+                  className="flex-1 bg-transparent text-[15px] resize-none outline-none py-2 leading-relaxed disabled:opacity-50 transition-all font-medium"
                   style={{ color: 'oklch(0.95 0 0)', maxHeight: '200px' }}
                 />
 
-                <div className="flex flex-col justify-end pb-1">
+                <div className="flex flex-col justify-end pb-1.5">
                   <button
                     onClick={() => handleSend()}
                     disabled={!input.trim() || loading}
-                    className="w-8 h-8 flex items-center justify-center transition-all duration-200 ease-out disabled:opacity-20"
+                    className="w-8 h-8 flex items-center justify-center transition-all duration-150 disabled:opacity-20"
                     style={{ color: 'oklch(0.95 0 0)' }}
                     onMouseEnter={e => {
                       if (!(!input.trim() || loading)) {

@@ -99,49 +99,82 @@ export default function Home() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.6 }}
-            className="flex justify-center max-w-2xl mx-auto mt-10"
+            className="flex justify-center max-w-2xl mx-auto mt-12"
           >
-            <form onSubmit={handleSearch} className="w-full relative group shadow-2xl shadow-primary/5 rounded-full">
+            <form onSubmit={handleSearch} className="w-full relative group">
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Ask anything..."
                 autoFocus
-                className="w-full bg-card/80 backdrop-blur-xl border border-white/10 py-5 pl-8 pr-16 rounded-full focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all text-lg"
+                className="w-full bg-[oklch(0.08_0_0)] py-5 pl-8 pr-16 rounded-full focus:outline-none transition-all duration-500 text-lg placeholder-[oklch(0.40_0_0)] text-[oklch(0.95_0_0)]"
+                style={{
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)',
+                }}
+                onFocus={e => {
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 0 30px oklch(0.65 0.20 250 / 0.15), inset 0 2px 4px rgba(0,0,0,0.5)';
+                }}
+                onBlur={e => {
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.5)';
+                }}
               />
               <button
                 type="submit"
                 disabled={!query.trim()}
-                className="absolute right-3 top-3 bottom-3 aspect-square bg-primary text-primary-foreground rounded-full flex items-center justify-center disabled:opacity-50 hover:scale-105 transition-transform"
+                className="absolute right-2 top-2 bottom-2 aspect-square rounded-full flex items-center justify-center disabled:opacity-30 transition-all duration-200"
+                style={{ color: query.trim() ? 'oklch(0.65 0.20 250)' : 'oklch(0.40 0 0)' }}
+                onMouseEnter={e => {
+                  if (query.trim()) {
+                    (e.currentTarget as HTMLElement).style.filter = 'drop-shadow(0 0 8px oklch(0.65 0.20 250 / 0.6))';
+                  }
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.filter = 'none';
+                }}
               >
                 <ArrowUpRight className="w-6 h-6" />
               </button>
             </form>
           </MotionDiv>
         </MotionDiv>
-
-        {/* Features Grid */}
-        <div className="grid md:grid-cols-3 gap-6 mb-24 max-w-5xl mx-auto text-left">
-          {features.map((feature, idx) => (
-            <MotionDiv
-              key={idx}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 + (0.1 * idx), duration: 0.6 }}
-              className="p-8 rounded-3xl border border-white/5 bg-card/30 backdrop-blur-sm hover:bg-card/50 transition-all"
-            >
-              <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-6">
-                <feature.icon className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="text-lg font-bold text-foreground mb-3 tracking-tight">
-                {feature.title}
-              </h3>
-              <p className="text-muted-foreground leading-relaxed font-medium text-[15px]">
-                {feature.description}
-              </p>
-            </MotionDiv>
-          ))}
+        {/* Floating Asymmetric Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left mt-24">
+          {features.map((feature, index) => {
+            // Asymmetric spacing and padding to create jazz timing / visual hierarchy
+            const mtClass = index === 0 ? 'mt-0' : index === 1 ? 'mt-16 md:mt-24' : 'mt-8 md:mt-12';
+            const paddingClass = index === 0 ? 'p-8 md:p-10' : 'p-6 md:p-8';
+            const titleClass = index === 0 ? 'text-lg md:text-xl' : 'text-base md:text-lg';
+            
+            return (
+              <MotionDiv
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + index * 0.1, duration: 0.8 }}
+                className={`flex flex-col relative group ${mtClass} ${paddingClass} rounded-3xl transition-all duration-500`}
+                style={{
+                  background: index === 0 ? 'oklch(0.13 0 0)' : 'transparent',
+                  borderTop: index !== 0 ? '1px solid oklch(0.18 0 0)' : 'none',
+                }}
+              >
+                {/* Micro-tonal hover separation */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none" style={{ background: 'oklch(0.14 0 0)' }} />
+                
+                <div className="relative z-10 flex flex-col h-full justify-between gap-6">
+                  <feature.icon className="w-5 h-5" style={{ color: index === 0 ? 'oklch(0.65 0.20 250)' : 'oklch(0.50 0 0)' }} />
+                  <div>
+                    <h3 className={`font-semibold tracking-tight text-[oklch(0.95_0_0)] mb-3 ${titleClass}`}>
+                      {feature.title}
+                    </h3>
+                    <p className="text-[oklch(0.60_0_0)] leading-relaxed text-[14px]">
+                      {feature.description}
+                    </p>
+                  </div>
+                </div>
+              </MotionDiv>
+            );
+          })}
         </div>
       </section>
 

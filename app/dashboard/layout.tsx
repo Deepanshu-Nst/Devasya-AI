@@ -75,40 +75,40 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Navigation */}
-      <nav className="px-3 space-y-1 flex-1">
+      <nav className="px-4 space-y-2 flex-1 mt-6">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
             <Link key={item.name} href={item.href}>
               <div
-                className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ease-out group cursor-pointer"
+                className="relative flex items-center gap-3.5 px-3 py-2.5 rounded-lg transition-all duration-150 group cursor-pointer"
                 style={{
                   background: 'transparent',
-                  color: isActive ? 'oklch(0.95 0 0)' : 'oklch(0.50 0 0)',
+                  color: isActive ? 'oklch(0.95 0 0)' : 'oklch(0.40 0 0)',
                 }}
                 onMouseEnter={e => {
-                  if (!isActive) (e.currentTarget as HTMLElement).style.color = 'oklch(0.80 0 0)';
+                  if (!isActive) (e.currentTarget as HTMLElement).style.color = 'oklch(0.70 0 0)';
                 }}
                 onMouseLeave={e => {
-                  if (!isActive) (e.currentTarget as HTMLElement).style.color = 'oklch(0.50 0 0)';
+                  if (!isActive) (e.currentTarget as HTMLElement).style.color = 'oklch(0.40 0 0)';
                 }}
               >
                 {/* Active Indicator — Diffuse ambient glow */}
                 {isActive && (
                   <MotionDiv
                     layoutId="activeNav"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-10 rounded-full blur-[10px]"
-                    style={{ background: 'oklch(0.65 0.20 250)', opacity: 0.4 }}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 rounded-full blur-[12px]"
+                    style={{ background: 'oklch(0.65 0.20 250)', opacity: 0.3 }}
                     initial={false}
                     transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                   />
                 )}
 
                 <item.icon
-                  className={`w-[16px] h-[16px] shrink-0 transition-all duration-200 ease-out ${isActive ? 'animate-pulse-glow' : ''}`}
+                  className={`w-[16px] h-[16px] shrink-0 transition-all duration-150 ${isActive ? 'animate-pulse-glow opacity-100' : 'opacity-40 group-hover:opacity-100'}`}
                   style={{ color: isActive ? 'oklch(0.65 0.20 250)' : 'inherit' }}
                 />
-                <span className="text-[13px] font-medium leading-none" style={{ color: 'inherit' }}>
+                <span className="text-[13px] font-medium leading-none tracking-wide" style={{ color: 'inherit' }}>
                   {item.name}
                 </span>
               </div>
@@ -118,23 +118,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </nav>
 
       {/* Footer Area */}
-      <div className="px-3 pb-6">
+      <div className="px-4 pb-6 mt-auto">
         <div className="px-3 py-3 flex items-center justify-between group">
-          <span className="text-[12px] font-medium truncate transition-colors duration-200 ease-out" style={{ color: 'oklch(0.60 0 0)' }}>
+          <span className="text-[12px] font-medium truncate transition-colors duration-150" style={{ color: 'oklch(0.40 0 0)' }}>
             {displayName}
           </span>
           <button
             onClick={handleLogout}
-            className="opacity-0 group-hover:opacity-100 transition-all duration-200 ease-out"
+            className="opacity-0 group-hover:opacity-100 transition-all duration-150"
             title="Sign Out"
-            style={{ color: 'oklch(0.40 0 0)' }}
+            style={{ color: 'oklch(0.30 0 0)' }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.color = 'oklch(0.80 0 0)';
-              (e.currentTarget as HTMLElement).style.filter = 'drop-shadow(0 0 4px oklch(0.80 0 0 / 0.3))';
+              (e.currentTarget as HTMLElement).style.color = 'oklch(0.70 0 0)';
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.color = 'oklch(0.40 0 0)';
-              (e.currentTarget as HTMLElement).style.filter = 'none';
+              (e.currentTarget as HTMLElement).style.color = 'oklch(0.30 0 0)';
             }}
           >
             <LogOut className="w-3.5 h-3.5" />
