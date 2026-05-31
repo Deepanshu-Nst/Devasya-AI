@@ -41,10 +41,10 @@ export default function BlockEditor({ initialContent, onChange, editable = true 
     return blocks.map(b => {
       const isKnown = b.type && knownTypes.has(b.type);
       const sanitized = { ...b };
-      if (!isKnown && b.type) {
-        console.warn(`Unknown block type: ${b.type}, converting to paragraph to prevent crash.`);
+      if (!isKnown) {
+        console.warn(`Unknown or missing block type: ${b.type || 'undefined'}, converting to paragraph to prevent crash.`);
         sanitized.type = 'paragraph';
-        sanitized.content = [{ type: "text", text: `[Unsupported Block Type: ${b.type}]`, styles: {} }];
+        sanitized.content = [{ type: "text", text: `[Unsupported Block Type: ${b.type || 'missing'}]`, styles: {} }];
         sanitized.props = {}; // clear unsupported props
       }
       if (sanitized.children && Array.isArray(sanitized.children)) {

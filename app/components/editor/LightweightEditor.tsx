@@ -17,25 +17,46 @@ interface LightweightEditorProps {
 export default function LightweightEditor({ initialContent, onChange, editable = true }: LightweightEditorProps) {
   const { theme } = useTheme();
 
-  let safeInitialContent: any = undefined;
-  if (initialContent) {
-    if (typeof initialContent === 'string') {
-      try {
-        const parsed = JSON.parse(initialContent);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          safeInitialContent = parsed;
+  const knownTypes = new Set([
+    'paragraph', 'heading', 'bulletListItem', 'numberedListItem', 
+    'checkListItem', 'image', 'file', 'video', 'audio', 'table', 
+    'codeBlock'
+  ]);
+
+  const sanitizeBlocks = (blocks: any): any[] | undefined => {
+    if (!Array.isArray(blocks)) {
+      if (typeof blocks === 'string') {
+        try {
+          const parsed = JSON.parse(blocks);
+          if (Array.isArray(parsed)) return sanitizeBlocks(parsed);
+          return undefined;
+        } catch {
+          return undefined;
         }
-      } catch (e) {
-        // ignore
       }
-    } else if (Array.isArray(initialContent) && initialContent.length > 0) {
-      safeInitialContent = initialContent;
+      return undefined;
     }
-  }
+    return blocks.map(b => {
+      const isKnown = b.type && knownTypes.has(b.type);
+      const sanitized = { ...b };
+      if (!isKnown) {
+        sanitized.type = 'paragraph';
+        sanitized.content = [{ type: "text", text: `[Unsupported Block Type: ${b.type || 'missing'}]`, styles: {} }];
+        sanitized.props = {}; 
+      }
+      if (sanitized.children && Array.isArray(sanitized.children)) {
+        const sanitizedChildren = sanitizeBlocks(sanitized.children);
+        if (sanitizedChildren) sanitized.children = sanitizedChildren;
+      }
+      return sanitized;
+    });
+  };
+
+  const safeInitialContent = sanitizeBlocks(initialContent);
 
   // Create a clean blocknote instance without our custom recursive blocks
   const editor = useCreateBlockNote({
-    initialContent: safeInitialContent,
+    initialContent: safeInitialContent && safeInitialContent.length > 0 ? safeInitialContent : undefined,
   });
 
   return (
