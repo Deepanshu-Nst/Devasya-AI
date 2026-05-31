@@ -8,6 +8,7 @@ import { Sparkles, FileText, CheckSquare, RefreshCw, ChevronRight } from "lucide
 export const schema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
+    database_view: DatabaseBlock as any,
     ai: AiBlock as any,
   },
 });
