@@ -75,7 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Navigation */}
-      <nav className="px-4 space-y-2 flex-1 mt-6">
+      <nav className="px-4 space-y-4 flex-1 mt-6">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
@@ -84,13 +84,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className="relative flex items-center gap-3.5 px-3 py-2.5 rounded-lg transition-all duration-150 group cursor-pointer"
                 style={{
                   background: 'transparent',
-                  color: isActive ? 'oklch(0.95 0 0)' : 'oklch(0.40 0 0)',
+                  color: isActive ? 'oklch(0.95 0 0)' : 'oklch(0.55 0 0)',
                 }}
                 onMouseEnter={e => {
-                  if (!isActive) (e.currentTarget as HTMLElement).style.color = 'oklch(0.70 0 0)';
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.background = 'oklch(0.12 0 0)';
+                  }
                 }}
                 onMouseLeave={e => {
-                  if (!isActive) (e.currentTarget as HTMLElement).style.color = 'oklch(0.40 0 0)';
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  }
                 }}
               >
                 {/* Active Indicator — Diffuse ambient glow */}

@@ -46,7 +46,7 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[oklch(0.11_0_0)] text-foreground">
+    <div className="min-h-screen relative overflow-hidden bg-[oklch(0.11_0_0)] text-foreground ambient-field">
       {/* Matte noise texture */}
       <div className="bg-noise" />
 
@@ -108,12 +108,12 @@ export default function Home() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Ask anything..."
                 autoFocus
-                className="w-full bg-[oklch(0.08_0_0)] py-5 pl-8 pr-16 rounded-full focus:outline-none transition-all duration-500 text-lg placeholder-[oklch(0.40_0_0)] text-[oklch(0.95_0_0)]"
+                className="w-full bg-[oklch(0.08_0_0)] py-5 pl-8 pr-16 rounded-full focus:outline-none transition-all duration-150 text-lg placeholder-[oklch(0.40_0_0)] text-[oklch(0.95_0_0)]"
                 style={{
                   boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)',
                 }}
                 onFocus={e => {
-                  (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 0 30px oklch(0.65 0.20 250 / 0.15), inset 0 2px 4px rgba(0,0,0,0.5)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 0 12px oklch(0.65 0.20 250 / 0.15), inset 0 2px 4px rgba(0,0,0,0.5)';
                 }}
                 onBlur={e => {
                   (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.5)';

@@ -203,7 +203,7 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
 
   return (
     <>
-      <div className="flex gap-12 overflow-x-auto h-full styled-scrollbar pr-12 pl-6 pt-6 pb-12">
+      <div className="flex gap-8 md:gap-16 overflow-x-auto h-full styled-scrollbar pr-12 pl-6 pt-6 pb-12">
         {statuses.map(status => {
           const config = STATUS_CONFIG[status] || STATUS_CONFIG['Todo'];
           const StatusIcon = config.icon;
@@ -215,9 +215,9 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
           return (
             <div
               key={status}
-              className="flex-1 min-w-[280px] max-w-[340px] flex flex-col transition-all duration-300 rounded-xl p-4"
+              className="flex-1 min-w-[280px] max-w-[340px] flex flex-col transition-all duration-300 rounded-xl p-4 relative group"
               style={{
-                background: isDragOver ? 'oklch(0.12 0 0)' : 'transparent',
+                background: isDragOver ? 'radial-gradient(ellipse at 50% 20%, oklch(0.12 0 0) 0%, transparent 70%)' : 'transparent',
               }}
               onDragOver={e => { e.preventDefault(); setDragOverColumn(status); }}
               onDragLeave={() => setDragOverColumn(null)}
@@ -228,8 +228,8 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
                 if (taskId) updateTaskStatus(taskId, status);
               }}
             >
-              {/* Minimal Column Header with top rail */}
-              <div className="pb-4 pt-3 flex items-center gap-3 shrink-0 border-t border-[oklch(0.20_0_0_/_0.5)]">
+              {/* Minimal Column Header with softer top rail */}
+              <div className="pb-4 pt-3 flex items-center gap-3 shrink-0 border-t border-[oklch(0.20_0_0_/_0.3)]">
                 <StatusIcon className="w-4 h-4 shrink-0" style={{ color: config.color }} />
                 <span className="text-[13px] font-semibold tracking-wider uppercase flex-1" style={{ color: 'oklch(0.50 0 0)' }}>
                   {status} <span className="opacity-40 font-normal ml-1 normal-case text-[12px]">({columnTasks.length})</span>

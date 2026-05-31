@@ -204,6 +204,18 @@
   mask-image: radial-gradient(ellipse at 80% 50%, black 10%, transparent 70%);
 }
 
+/* Phase 5: Ambient Depth and Conversational Gravity */
+.ambient-field {
+  background: radial-gradient(circle at 50% 50%, transparent 0%, oklch(0.08 0 0) 100%);
+  pointer-events: none;
+}
+
+.conversational-lane {
+  background: radial-gradient(ellipse at 50% 50%, oklch(0.12 0 0) 0%, transparent 70%);
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }

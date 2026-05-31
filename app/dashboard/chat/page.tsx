@@ -348,10 +348,15 @@ export default function ChatMode() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.15 }}
-                      className="flex gap-5"
+                      className="flex gap-5 relative group"
                     >
+                      {/* Conversational Lane */}
+                      {idx % 2 === 0 && (
+                        <div className="absolute inset-y-[-24px] inset-x-[-32px] conversational-lane opacity-[0.04] transition-opacity duration-150 group-hover:opacity-[0.07]" />
+                      )}
+                      
                       {/* Avatar */}
-                      <div className="shrink-0 mt-1">
+                      <div className="shrink-0 mt-1 relative z-10">
                         {m.role === 'user' ? (
                           <div className="w-6 h-6 flex items-center justify-center rounded" style={{ background: 'oklch(0.20 0 0)' }}>
                             <User className="w-3.5 h-3.5" style={{ color: 'oklch(0.70 0 0)' }} />
@@ -502,18 +507,20 @@ export default function ChatMode() {
             
             <div className="max-w-2xl mx-auto flex flex-col items-center relative z-10">
               <div
-                className="w-full flex items-end gap-3 px-5 py-3 transition-all duration-300 group rounded-2xl"
+                className="w-full flex items-end gap-3 px-5 py-3 transition-all duration-150 group rounded-2xl"
                 style={{ 
                   background: 'oklch(0.13 0 0 / 0.5)',
                   borderTop: '1px solid oklch(0.95 0 0 / 0.03)',
-                  boxShadow: 'inset 0 1px 0 oklch(0.95 0 0 / 0.02), 0 -8px 24px -8px rgba(0,0,0,0.4)',
+                  boxShadow: 'inset 0 1px 0 oklch(0.95 0 0 / 0.02), inset 0 0 0 transparent, 0 -8px 24px -8px rgba(0,0,0,0.4)',
                   backdropFilter: 'blur(16px)'
                 }}
                 onFocus={e => {
                   (e.currentTarget as HTMLElement).style.background = 'oklch(0.14 0 0 / 0.7)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 1px 0 oklch(0.95 0 0 / 0.05), inset 0 0 32px oklch(0.18 0 0 / 0.5), 0 -8px 24px -8px rgba(0,0,0,0.5)';
                 }}
                 onBlur={e => {
                   (e.currentTarget as HTMLElement).style.background = 'oklch(0.13 0 0 / 0.5)';
+                  (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 1px 0 oklch(0.95 0 0 / 0.02), inset 0 0 0 transparent, 0 -8px 24px -8px rgba(0,0,0,0.4)';
                 }}
               >
                 <div className="flex flex-col justify-end pb-2">
