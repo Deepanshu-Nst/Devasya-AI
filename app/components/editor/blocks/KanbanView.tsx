@@ -163,8 +163,10 @@ export default function KanbanView({ entityType = "task", statusOptions }: Kanba
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   key={task.id}
-                  draggable
-                  onDragStart={(e: any) => e.dataTransfer.setData("taskId", task.id)}
+                  {...({ 
+                    draggable: true, 
+                    onDragStart: (e: any) => e.dataTransfer.setData("taskId", task.id) 
+                  } as any)}
                   className="bg-black/40 border border-white/5 rounded-lg p-3 cursor-pointer hover:border-white/20 transition-all group"
                   onClick={() => openTask(task)}
                 >
