@@ -61,6 +61,8 @@ class MemoryPage(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
+    workspace = relationship("Workspace", back_populates="memory_pages")
+    creator = relationship("Profile", back_populates="memory_pages")
     # Chunks are now on Block, but we can leave this empty or removed since memory pages are deprecated
     # chunks = relationship("DocumentChunk", back_populates="memory", cascade="all, delete-orphan")
 
