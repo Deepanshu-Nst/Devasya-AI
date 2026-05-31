@@ -18,11 +18,40 @@ interface BlockEditorProps {
 export default function BlockEditor({ initialContent, onChange, editable = true }: BlockEditorProps) {
   const { theme } = useTheme();
 
+  // Filter unknown block types to prevent Prosemirror 'reading node' crashes
+  const knownTypes = new Set([
+    'paragraph', 'heading', 'bulletListItem', 'numberedListItem', 
+    'checkListItem', 'image', 'file', 'video', 'audio', 'table', 
+    'codeBlock', 'database_view', 'ai'
+  ]);
+
+  const sanitizeBlocks = (blocks: any[]): any[] => {
+    if (!Array.isArray(blocks)) return blocks;
+    return blocks.map(b => {
+      const isKnown = b.type && knownTypes.has(b.type);
+      const sanitized = { ...b };
+      if (!isKnown && b.type) {
+        console.warn(`Unknown block type: ${b.type}, converting to paragraph to prevent crash.`);
+        sanitized.type = 'paragraph';
+        sanitized.content = `[Unsupported Block Type: ${b.type}]`;
+        sanitized.props = {}; // clear unsupported props
+      }
+      if (sanitized.children && Array.isArray(sanitized.children)) {
+        sanitized.children = sanitizeBlocks(sanitized.children);
+      }
+      return sanitized;
+    });
+  };
+
+  const safeInitialContent = initialContent && initialContent.length > 0 
+    ? sanitizeBlocks(initialContent) 
+    : undefined;
+
   // Initialize the editor with initial content.
   // We use useCreateBlockNote to properly manage the editor lifecycle in React.
   const editor = useCreateBlockNote({
     schema,
-    initialContent: initialContent && initialContent.length > 0 ? initialContent as any : undefined,
+    initialContent: safeInitialContent as any,
   });
 
   return (
