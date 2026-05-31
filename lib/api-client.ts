@@ -82,10 +82,13 @@ class ApiClient {
         result = { detail: response.statusText };
       }
 
+      const errorDetail = result.detail || result.message || 'Request failed';
+      const errorMessage = typeof errorDetail === 'string' ? errorDetail : JSON.stringify(errorDetail);
+
       return {
         data: result,
         status: response.status,
-        error: response.ok ? undefined : result.detail || 'Request failed',
+        error: response.ok ? undefined : errorMessage,
       };
     } catch (error: any) {
       return {

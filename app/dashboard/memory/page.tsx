@@ -73,7 +73,10 @@ export default function MemoryMode() {
   };
 
   const handleSave = async () => {
-    if (!editContent.trim()) return;
+    if (!editContent.trim()) {
+      setSaveError('Note content cannot be empty. Please write something.');
+      return;
+    }
     setIsSaving(true);
     setSaveSuccess(false);
     setSaveError(null);
@@ -317,7 +320,7 @@ export default function MemoryMode() {
                      <button
                        onClick={handleSave}
                        disabled={isSaving}
-                       className="flex items-center gap-2 text-sm font-medium hover:bg-white/5 px-3 py-1.5 rounded-md transition-colors text-foreground/80"
+                       className="flex items-center gap-2 text-sm font-medium hover:bg-white/5 px-3 py-1.5 rounded-md transition-colors text-foreground/80 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                      >
                        {isSaving ? <span className="animate-pulse">Saving...</span> : saveSuccess ? <><Check className="w-4 h-4 text-green-500" /> Saved</> : 'Save'}
                      </button>
