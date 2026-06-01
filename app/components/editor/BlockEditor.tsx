@@ -43,6 +43,7 @@ export default function BlockEditor({ initialContent, onChange, editable = true 
       
       const isKnown = typeof b.type === 'string' && knownTypes.has(b.type);
       const sanitized: any = { type: isKnown ? b.type : 'paragraph' };
+      if (b.id) sanitized.id = b.id;
       
       if (!isKnown) {
         console.warn(`Unknown or missing block type: ${b.type || 'undefined'}, converting to paragraph.`);

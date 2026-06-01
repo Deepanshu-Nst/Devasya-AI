@@ -44,6 +44,7 @@ function formatRelativeDate(dateStr: string): string {
 export default function MemoryMode() {
   const [memories, setMemories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isFetchingContent, setIsFetchingContent] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
@@ -108,6 +109,7 @@ export default function MemoryMode() {
     }
 
     setEditTitle(item.title || '');
+    setIsFetchingContent(true);
     try {
       const res = await blocksApi.getChildren(item.id);
       if (res.status === 200 && res.data) {
@@ -143,6 +145,8 @@ export default function MemoryMode() {
         blocks = item.content ? [{ type: 'paragraph', content: item.content }] : [];
       }
       setEditContent(blocks);
+    } finally {
+      setIsFetchingContent(false);
     }
   };
 
@@ -479,13 +483,21 @@ export default function MemoryMode() {
                       style={{ fontSize: '2rem', lineHeight: '1.2', color: 'oklch(0.95 0 0)' }}
                     />
                     <div className="min-h-[400px]">
-                      <ErrorBoundary>
-                        <BlockEditor
-                          key={selectedItem.id}
-                          initialContent={editContent}
-                          onChange={blocks => { setEditContent(blocks); setSaveSuccess(false); setSaveError(null); }}
-                        />
-                      </ErrorBoundary>
+                      {isFetchingContent ? (
+                        <div className="flex flex-col gap-3 p-2">
+                          <div className="skeleton h-4 rounded w-3/4 opacity-50" />
+                          <div className="skeleton h-4 rounded w-1/2 opacity-50" />
+                          <div className="skeleton h-4 rounded w-5/6 opacity-50" />
+                        </div>
+                      ) : (
+                        <ErrorBoundary>
+                          <BlockEditor
+                            key={selectedItem.id}
+                            initialContent={editContent}
+                            onChange={blocks => { setEditContent(blocks); setSaveSuccess(false); setSaveError(null); }}
+                          />
+                        </ErrorBoundary>
+                      )}
                     </div>
                   </div>
                 )}
