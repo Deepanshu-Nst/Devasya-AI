@@ -123,7 +123,7 @@ def get_block_children(
     
     return children
 
-@router.post("/", response_model=BlockResponse)
+@router.post("", response_model=BlockResponse)
 def create_block(
     block_data: BlockCreate,
     current_user: Profile = Depends(get_current_user),

@@ -53,7 +53,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Sparkles className="w-5 h-5 animate-pulse" style={{ color: 'oklch(0.65 0.20 250)' }} />
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-muted-foreground text-[13px] font-mono tracking-widest uppercase">
+            synchronizing archive
+            <span className="animate-cursor ml-1" style={{ color: 'oklch(0.65 0.20 250)' }}>▍</span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -81,24 +86,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           return (
             <Link key={item.name} href={item.href}>
               <div
-                className="relative flex items-center gap-3.5 px-3 py-2.5 rounded-lg transition-all duration-150 group cursor-pointer"
+                className="relative flex items-center gap-3.5 px-3 py-2.5 rounded-lg transition-colors duration-150 group cursor-pointer"
                 style={{
-                  background: isActive ? 'oklch(0.12 0 0)' : 'transparent',
-                  color: isActive ? 'oklch(0.85 0 0)' : 'oklch(0.55 0 0)',
+                  color: isActive ? 'oklch(0.95 0 0)' : 'oklch(0.40 0 0)',
                 }}
                 onMouseEnter={e => {
                   if (!isActive) {
-                    (e.currentTarget as HTMLElement).style.background = 'oklch(0.12 0 0)';
+                    (e.currentTarget as HTMLElement).style.color = 'oklch(0.85 0 0)';
                   }
                 }}
                 onMouseLeave={e => {
                   if (!isActive) {
-                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                    (e.currentTarget as HTMLElement).style.color = 'oklch(0.40 0 0)';
                   }
                 }}
               >
-                <item.icon className="w-[18px] h-[18px] shrink-0 transition-transform duration-150 group-hover:scale-105" />
-                <span className="text-[14px] font-medium tracking-tight">
+                <item.icon className="w-[18px] h-[18px] shrink-0 transition-transform duration-150 group-hover:scale-105" style={{ color: isActive ? 'oklch(0.65 0.20 250)' : 'inherit' }} />
+                <span className="text-[14px] font-medium tracking-wide">
                   {item.name}
                 </span>
               </div>
@@ -140,7 +144,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* ─── Desktop Sidebar ─── */}
       <aside
         className="hidden md:flex w-56 shrink-0 flex-col sticky top-0 h-screen z-10"
-        style={{ borderRight: '1px solid oklch(0.13 0 0)' }}
       >
         <SidebarContent />
       </aside>

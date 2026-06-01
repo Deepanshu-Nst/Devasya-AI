@@ -6,6 +6,7 @@ import { useAuth } from '@/components/auth-provider';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import { ArrowUpRight, Brain, Zap, Shield, Sparkles } from 'lucide-react';
+import { SemanticFragments } from '@/components/SemanticFragments';
 
 const MotionDiv = motion.div as any;
 
@@ -49,6 +50,9 @@ export default function Home() {
     <div className="min-h-screen relative overflow-hidden bg-[oklch(0.11_0_0)] text-foreground">
       {/* Ambient Depth Layer */}
       <div className="absolute inset-0 ambient-field pointer-events-none z-0" />
+      
+      {/* Drifting Semantic Fragments */}
+      <SemanticFragments />
 
       {/* Atmospheric Depth Layering - Multi-stop gradient for vignette falloff */}
       <div 

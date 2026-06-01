@@ -216,7 +216,7 @@ export default function MemoryMode() {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2000);
       } else {
-        setSaveError(batchRes.error || 'Failed to save.');
+        setSaveError(batchRes.error || 'Failed to persist memory.');
       }
     } catch (e: any) {
       setSaveError(e?.message || 'Unexpected error.');
@@ -251,7 +251,7 @@ export default function MemoryMode() {
     if (!e.target.files?.[0]) return;
     const file = e.target.files[0];
     setIsUploading(true);
-    setUploadStatus('Processing document...');
+    setUploadStatus('Indexing context chunks...');
     setUploadError(null);
 
     const stages = [
@@ -311,7 +311,7 @@ export default function MemoryMode() {
     return (
       <button
         onClick={() => handleSelect(item)}
-        className="w-full group flex items-center gap-3 px-3 py-2 text-left transition-all duration-150 rounded-lg relative"
+        className="w-full group flex items-center gap-3 px-3 py-2 text-left transition-all duration-150 rounded-lg relative cognitive-surface"
         style={{ 
           color: isActive ? 'oklch(0.95 0 0)' : 'oklch(0.50 0 0)',
           background: isActive ? 'oklch(0.14 0 0)' : 'transparent' 
@@ -356,7 +356,7 @@ export default function MemoryMode() {
             onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = 'oklch(0.75 0.20 250)')}
             onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'oklch(0.65 0.20 250)')}
           >
-            <Plus className="w-4 h-4" /> New note
+            <Plus className="w-4 h-4" /> New memory
           </button>
           
           <button
@@ -448,7 +448,7 @@ export default function MemoryMode() {
                       <button
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="text-[12px] transition-colors disabled:opacity-50"
+                        className="text-[14px] font-medium transition-colors disabled:opacity-50"
                         style={{ color: saveSuccess ? 'oklch(0.65 0.15 150)' : 'oklch(0.50 0 0)' }}
                       >
                         {isSaving ? 'Saving...' : saveSuccess ? 'Saved' : 'Save'}
@@ -478,11 +478,11 @@ export default function MemoryMode() {
                       type="text"
                       value={editTitle}
                       onChange={e => { setEditTitle(e.target.value); setSaveSuccess(false); setSaveError(null); }}
-                      placeholder="Title"
+                      placeholder="Context title"
                       className="w-full bg-transparent outline-none font-semibold tracking-tight mb-8 placeholder:text-[oklch(0.25_0_0)]"
                       style={{ fontSize: '2rem', lineHeight: '1.2', color: 'oklch(0.95 0 0)' }}
                     />
-                    <div className="min-h-[400px]">
+                    <div className="min-h-[400px] cognitive-surface rounded-2xl p-4 -mx-4">
                       {isFetchingContent ? (
                         <div className="flex flex-col gap-3 p-2">
                           <div className="skeleton h-4 rounded w-3/4 opacity-50" />

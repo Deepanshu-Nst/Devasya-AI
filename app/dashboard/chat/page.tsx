@@ -256,7 +256,7 @@ export default function ChatMode() {
 
         <div className="flex-1 overflow-y-auto no-scrollbar pr-4">
           {loading && sessions.length === 0 ? (
-            <div className="text-[12px]" style={{ color: 'oklch(0.40 0 0)' }}>Loading...</div>
+            <div className="text-[12px] animate-pulse" style={{ color: 'oklch(0.40 0 0)' }}>retrieving history...</div>
           ) : sessions.length === 0 ? (
             <div className="text-[12px]" style={{ color: 'oklch(0.40 0 0)' }}>No history</div>
           ) : (
@@ -340,7 +340,7 @@ export default function ChatMode() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.6 }}
-                  className="flex flex-col space-y-20"
+                  className="flex flex-col space-y-24"
                 >
                   {messages.map((m, idx) => (
                     <MotionDiv
@@ -348,7 +348,7 @@ export default function ChatMode() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.15 }}
-                      className="flex gap-5 relative group"
+                      className="flex gap-5 relative group cognitive-surface p-4 rounded-2xl -mx-4"
                     >
                       {/* Active Conversational Emphasis */}
                       {idx === messages.length - 1 && m.role === 'assistant' && !loading && (
@@ -377,7 +377,7 @@ export default function ChatMode() {
                       {/* Content — completely borderless, letting typography breathe */}
                       <div className="flex-1 min-w-0 flex flex-col gap-4 pt-0.5">
                         <div
-                          className="leading-relaxed text-[15px] whitespace-pre-wrap font-medium max-w-[60ch]"
+                          className="leading-relaxed text-[15px] whitespace-pre-wrap font-medium max-w-[55ch]"
                           style={{ color: m.role === 'user' ? 'oklch(0.95 0 0)' : 'oklch(0.85 0 0)' }}
                         >
                           {m.content}
@@ -479,7 +479,7 @@ export default function ChatMode() {
                     <MotionDiv
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="flex gap-5 relative"
+                      className="flex gap-5 relative p-4"
                     >
                       <div className="absolute inset-y-[-24px] inset-x-[-32px] conversational-lane opacity-[0.05] animate-breathe pointer-events-none" />
                       <div className="shrink-0 mt-1 relative z-10">
@@ -507,14 +507,13 @@ export default function ChatMode() {
             
             <div className="max-w-2xl mx-auto flex flex-col items-center relative z-10">
               <div
-                className="w-full flex items-end gap-3 px-5 py-3 transition-all duration-150 group"
+                className="w-full flex items-end gap-3 px-5 py-3 transition-all duration-150 group cognitive-surface rounded-2xl"
                 style={{ 
                   background: 'oklch(0.11 0 0 / 0.55)',
-                  borderBottom: '1px solid oklch(0.20 0 0)',
                   backdropFilter: 'blur(16px)'
                 }}
                 onFocus={e => {
-                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.12 0 0 / 0.65)';
+                  (e.currentTarget as HTMLElement).style.background = 'oklch(0.12 0 0 / 0.85)';
                   (e.currentTarget as HTMLElement).style.boxShadow = 'inset 0 0 24px oklch(0.14 0 0 / 0.5)';
                 }}
                 onBlur={e => {
