@@ -29,9 +29,9 @@ interface KanbanViewProps {
 // ─── Design constants (Sparse/Minimal) ────────────────────────
 const STATUS_CONFIG: Record<string, { color: string; icon: React.ElementType }> = {
   'Todo': { color: 'oklch(0.40 0 0)', icon: Circle },
-  'In Progress': { color: 'oklch(0.65 0.20 250)', icon: Clock },
-  'Done': { color: 'oklch(0.65 0.15 150)', icon: CircleCheck },
-  'Blocked': { color: 'oklch(0.60 0.20 25)', icon: Ban },
+  'Processing': { color: 'oklch(0.50 0.10 250)', icon: Clock },
+  'Integrated': { color: 'oklch(0.50 0.05 150)', icon: CircleCheck },
+  'Blocked': { color: 'oklch(0.45 0.10 25)', icon: Ban },
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
@@ -273,13 +273,13 @@ export default function KanbanView({ entityType = 'task', statusOptions }: Kanba
                       draggable
                       onDragStart={(e: any) => e.dataTransfer.setData('taskId', task.id)}
                       onClick={() => openTask(task)}
-                      className="group p-4 cursor-pointer transition-colors duration-150 relative rounded-xl"
-                      style={{ background: 'oklch(0.13 0 0)' }}
+                      className="group py-4 cursor-pointer transition-colors duration-150 relative"
+                      style={{ borderBottom: '1px solid oklch(0.15 0 0)' }}
                       onMouseEnter={(e: React.MouseEvent) => {
-                        (e.currentTarget as HTMLElement).style.background = 'oklch(0.14 0 0)';
+                        (e.currentTarget as HTMLElement).style.borderBottom = '1px solid oklch(0.25 0 0)';
                       }}
                       onMouseLeave={(e: React.MouseEvent) => {
-                        (e.currentTarget as HTMLElement).style.background = 'oklch(0.13 0 0)';
+                        (e.currentTarget as HTMLElement).style.borderBottom = '1px solid oklch(0.15 0 0)';
                       }}
                     >
                       <div className="flex items-start gap-2 pl-2">

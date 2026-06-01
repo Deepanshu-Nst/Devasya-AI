@@ -44,10 +44,13 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden text-foreground">
+      {/* Cinematic noise texture */}
+      <div className="cinematic-grain" />
+
       {/* Ambient background glow — cinematic and sparse */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden flex items-center justify-center">
         <div
-          className="w-[800px] h-[600px] rounded-full blur-[160px] opacity-20"
+          className="w-[800px] h-[600px] rounded-full blur-[160px] opacity-20 animate-breathe"
           style={{ background: 'oklch(0.65 0.20 250)' }}
         />
       </div>
@@ -61,11 +64,16 @@ export default function AuthPage() {
         <div className="flex flex-col items-center">
           {/* Logo mark */}
           <div className="mb-10 text-center">
-            <div className="flex items-center justify-center mb-6">
+            <MotionDiv 
+              initial={{ filter: 'blur(10px)', opacity: 0 }}
+              animate={{ filter: 'blur(0px)', opacity: 1 }}
+              transition={{ delay: 1, duration: 2.5, ease: 'easeOut' }}
+              className="flex items-center justify-center mb-6"
+            >
               <Sparkles className="w-8 h-8" style={{ color: 'oklch(0.65 0.20 250)' }} />
-            </div>
+            </MotionDiv>
             <h1 className="text-4xl font-bold tracking-tight mb-2">Devasya AI</h1>
-            <p className="text-sm tracking-wide opacity-50 uppercase">Intelligence System</p>
+            <p className="text-[11px] tracking-[0.18em] opacity-50 uppercase font-medium">Intelligence System</p>
           </div>
 
           {/* Error */}

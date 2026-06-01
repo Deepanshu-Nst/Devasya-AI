@@ -9,9 +9,10 @@ const MotionDiv = motion.div as any;
 export default function GlobalTasksPage() {
   return (
     <div
-      className="flex flex-col h-full overflow-hidden"
+      className="flex flex-col h-full overflow-hidden relative"
       style={{ background: 'oklch(0.115 0 0)' }}
     >
+      <div className="cinematic-grain" />
       {/* Page header */}
       <div
         className="shrink-0 px-8 py-5 flex items-center justify-between"
@@ -38,7 +39,7 @@ export default function GlobalTasksPage() {
       <div className="flex-1 overflow-hidden p-6">
         <KanbanView
           entityType="task"
-          statusOptions="Todo, In Progress, Done, Blocked"
+          statusOptions="Todo, Processing, Integrated, Blocked"
         />
       </div>
     </div>

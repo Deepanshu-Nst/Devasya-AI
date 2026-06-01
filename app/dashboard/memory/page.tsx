@@ -351,18 +351,18 @@ export default function MemoryMode() {
         <div className="flex gap-2 mb-6">
           <button
             onClick={handleCreateNew}
-            className="flex items-center gap-1.5 text-[13px] font-medium transition-colors"
+            className="flex items-center gap-1.5 text-[11px] tracking-[0.18em] uppercase font-medium transition-colors"
             style={{ color: 'oklch(0.65 0.20 250)' }}
             onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = 'oklch(0.75 0.20 250)')}
             onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'oklch(0.65 0.20 250)')}
           >
-            <Plus className="w-4 h-4" /> New memory
+            <Plus className="w-4 h-4" /> Instantiate
           </button>
           
           <button
             onClick={() => { setUploadError(null); fileInputRef.current?.click(); }}
             disabled={isUploading}
-            title="Upload document"
+            title="Ingest document"
             className="flex items-center justify-center w-6 h-6 ml-auto transition-colors disabled:opacity-50"
             style={{ color: 'oklch(0.40 0 0)' }}
             onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = 'oklch(0.80 0 0)')}
@@ -435,8 +435,8 @@ export default function MemoryMode() {
               <MotionDiv initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col h-full">
                 
                 {/* Minimal Header */}
-                <div className="flex items-center justify-between mb-12">
-                  <div className="text-[11px] font-mono tracking-widest uppercase" style={{ color: 'oklch(0.35 0 0)' }}>
+                <div className="flex items-center justify-between mb-24">
+                  <div className="text-[11px] font-mono tracking-[0.18em] uppercase" style={{ color: 'oklch(0.35 0 0)' }}>
                     [ {selectedItem.isDocInfo ? 'CONTEXT / DOC' : 'CONTEXT / NOTE'} ]
                   </div>
 
@@ -448,10 +448,10 @@ export default function MemoryMode() {
                       <button
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="text-[14px] font-medium transition-colors disabled:opacity-50"
+                        className="text-[11px] tracking-[0.18em] uppercase font-medium transition-colors disabled:opacity-50"
                         style={{ color: saveSuccess ? 'oklch(0.65 0.15 150)' : 'oklch(0.50 0 0)' }}
                       >
-                        {isSaving ? 'Saving...' : saveSuccess ? 'Saved' : 'Save'}
+                        {isSaving ? 'Persisting...' : saveSuccess ? 'Persisted' : 'Persist'}
                       </button>
                     )}
                     <button
@@ -479,10 +479,17 @@ export default function MemoryMode() {
                       value={editTitle}
                       onChange={e => { setEditTitle(e.target.value); setSaveSuccess(false); setSaveError(null); }}
                       placeholder="Context title"
-                      className="w-full bg-transparent outline-none font-semibold tracking-tight mb-8 placeholder:text-[oklch(0.25_0_0)]"
+                      className="w-full bg-transparent outline-none font-medium tracking-tight mb-4 placeholder:text-[oklch(0.25_0_0)]"
                       style={{ fontSize: '2rem', lineHeight: '1.2', color: 'oklch(0.95 0 0)' }}
                     />
-                    <div className="min-h-[400px] cognitive-surface rounded-2xl p-4 -mx-4">
+                    <div className="flex gap-4 mb-16 text-[11px] tracking-[0.18em] uppercase font-medium opacity-40" style={{ color: 'oklch(0.50 0 0)' }}>
+                      <span>coherence stable</span>
+                      <span className="opacity-50">•</span>
+                      <span>indexed recently</span>
+                      <span className="opacity-50">•</span>
+                      <span>linked across threads</span>
+                    </div>
+                    <div className="min-h-[400px]">
                       {isFetchingContent ? (
                         <div className="flex flex-col gap-3 p-2">
                           <div className="skeleton h-4 rounded w-3/4 opacity-50" />

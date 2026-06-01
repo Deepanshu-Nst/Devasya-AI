@@ -117,12 +117,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="text-muted-foreground text-[13px] font-mono tracking-widest uppercase">
+          <div className="text-muted-foreground text-[11px] font-mono tracking-[0.18em] uppercase">
             reconstructing thread
             <span className="animate-cursor ml-1 text-primary">▍</span>
-          </div>
-          <div className="h-0.5 w-24 bg-primary/20 rounded-full overflow-hidden">
-            <div className="h-full bg-primary/40 rounded-full animate-pulse w-full"></div>
           </div>
         </div>
       </div>

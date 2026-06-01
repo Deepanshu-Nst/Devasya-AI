@@ -136,8 +136,10 @@
 
   body {
     @apply bg-background text-foreground;
+    font-size: 15px;
+    font-weight: 400;
     font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1;
-    line-height: 1.6;
+    line-height: 1.8;
     letter-spacing: -0.01em; /* Tighter typography for modern feel */
   }
 
@@ -199,6 +201,13 @@
   pointer-events: none;
 }
 
+.cinematic-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.02;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
 .conversational-lane {
   background: radial-gradient(ellipse at 50% 50%, oklch(0.12 0 0) 0%, transparent 70%);
   border-radius: 9999px;
@@ -221,8 +230,8 @@
 }
 
 @keyframes breathe {
-  0%, 100% { opacity: 0.03; transform: scale(1); }
-  50% { opacity: 0.05; transform: scale(1.02); }
+  0%, 100% { opacity: 0.015; filter: blur(60px); }
+  50% { opacity: 0.03; filter: blur(80px); }
 }
 
 @keyframes cursor-blink {
@@ -292,7 +301,7 @@
 .text-label {
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted-foreground);
 }

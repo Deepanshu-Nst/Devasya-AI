@@ -256,9 +256,9 @@ export default function ChatMode() {
 
         <div className="flex-1 overflow-y-auto no-scrollbar pr-4">
           {loading && sessions.length === 0 ? (
-            <div className="text-[12px] animate-pulse" style={{ color: 'oklch(0.40 0 0)' }}>retrieving history...</div>
+            <div className="text-[11px] tracking-[0.18em] uppercase font-medium animate-pulse" style={{ color: 'oklch(0.40 0 0)' }}>synthesizing history...</div>
           ) : sessions.length === 0 ? (
-            <div className="text-[12px]" style={{ color: 'oklch(0.40 0 0)' }}>No history</div>
+            <div className="text-[11px] tracking-[0.18em] uppercase font-medium" style={{ color: 'oklch(0.40 0 0)' }}>No history</div>
           ) : (
             <div className="space-y-6">
               {todaySessions.length > 0 && (
@@ -331,7 +331,7 @@ export default function ChatMode() {
                       onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = 'oklch(0.75 0.20 250)')}
                       onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = 'oklch(0.65 0.20 250)')}
                     >
-                      Initialize Memory →
+                      Instantiate Memory →
                     </button>
                   </div>
                 </MotionDiv>
@@ -340,15 +340,18 @@ export default function ChatMode() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.6 }}
-                  className="flex flex-col space-y-24"
+                  className="flex flex-col space-y-32 relative"
                 >
+                  {/* Signal Residue Thread Line */}
+                  <div className="absolute left-[34px] top-[32px] bottom-[-128px] w-[1px] opacity-[0.025] pointer-events-none mix-blend-screen" style={{ background: 'linear-gradient(to bottom, transparent, oklch(0.65 0.20 250) 15%, oklch(0.65 0.20 250) 85%, transparent)', filter: 'blur(1px)' }} />
+
                   {messages.map((m, idx) => (
                     <MotionDiv
                       key={idx}
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.15 }}
-                      className="flex gap-5 relative group cognitive-surface p-4 rounded-2xl -mx-4"
+                      transition={{ duration: 0.3, ease: 'easeOut', delay: m.role === 'assistant' ? 0.1 : 0 }}
+                      className={`flex gap-6 relative group ${m.role === 'assistant' ? 'cognitive-surface' : ''} p-4 rounded-2xl -mx-4`}
                     >
                       {/* Active Conversational Emphasis */}
                       {idx === messages.length - 1 && m.role === 'assistant' && !loading && (
@@ -356,18 +359,18 @@ export default function ChatMode() {
                       )}
                       
                       {/* Avatar */}
-                      <div className="shrink-0 mt-1 relative z-10">
+                      <div className="shrink-0 mt-1 relative z-10 w-8 flex justify-center">
                         {m.role === 'user' ? (
-                          <div className="w-6 h-6 flex items-center justify-center">
-                            <User className="w-4 h-4" style={{ color: 'oklch(0.50 0 0)' }} />
+                          <div className="w-6 h-6 flex items-center justify-center opacity-40">
+                            <User className="w-4 h-4" style={{ color: 'oklch(0.60 0 0)' }} />
                           </div>
                         ) : (
                           <>
                             {idx === messages.length - 1 && loading && (
-                              <div className="absolute inset-0 bg-[oklch(0.65_0.20_250)] rounded-full blur-[8px] animate-breathe opacity-50 pointer-events-none" />
+                              <div className="absolute inset-0 bg-[oklch(0.65_0.20_250)] rounded-full blur-[10px] animate-breathe opacity-30 pointer-events-none" />
                             )}
                             <Sparkles 
-                              className={`w-6 h-6 relative z-10 ${idx === messages.length - 1 && loading ? 'animate-pulse-glow' : ''}`} 
+                              className={`w-5 h-5 relative z-10 ${idx === messages.length - 1 && loading ? 'animate-pulse-glow' : 'opacity-70'}`} 
                               style={{ color: 'oklch(0.65 0.20 250)' }} 
                             />
                           </>
@@ -375,14 +378,14 @@ export default function ChatMode() {
                       </div>
 
                       {/* Content — completely borderless, letting typography breathe */}
-                      <div className="flex-1 min-w-0 flex flex-col gap-4 pt-0.5">
+                      <div className={`flex-1 min-w-0 flex flex-col gap-5 pt-0.5 ${m.role === 'user' ? 'opacity-70 font-normal' : 'font-medium'}`}>
                         <div
-                          className="leading-relaxed text-[15px] whitespace-pre-wrap font-medium max-w-[55ch]"
-                          style={{ color: m.role === 'user' ? 'oklch(0.95 0 0)' : 'oklch(0.85 0 0)' }}
+                          className={`leading-relaxed text-[15px] whitespace-pre-wrap ${m.role === 'assistant' ? 'max-w-[58ch]' : 'max-w-[65ch]'}`}
+                          style={{ color: m.role === 'user' ? 'oklch(0.70 0 0)' : 'oklch(0.95 0 0)' }}
                         >
                           {m.content}
                           {m.role === 'assistant' && loading && idx === messages.length - 1 && (
-                            <span className="animate-cursor ml-1 text-[15px]" style={{ color: 'oklch(0.65 0.20 250)' }}>▍</span>
+                            <span className="animate-cursor ml-1 text-[15px] opacity-40" style={{ color: 'oklch(0.65 0.20 250)' }}>▍</span>
                           )}
                         </div>
 
@@ -479,11 +482,11 @@ export default function ChatMode() {
                     <MotionDiv
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="flex gap-5 relative p-4"
+                      className="flex gap-6 relative p-4"
                     >
-                      <div className="absolute inset-y-[-24px] inset-x-[-32px] conversational-lane opacity-[0.05] animate-breathe pointer-events-none" />
-                      <div className="shrink-0 mt-1 relative z-10">
-                        <Sparkles className="w-5 h-5 opacity-40" style={{ color: 'oklch(0.65 0.20 250)' }} />
+                      <div className="absolute inset-y-[-24px] inset-x-[-32px] conversational-lane opacity-[0.03] animate-breathe pointer-events-none" />
+                      <div className="shrink-0 mt-1 relative z-10 w-8 flex justify-center">
+                        <Sparkles className="w-5 h-5 opacity-30" style={{ color: 'oklch(0.65 0.20 250)' }} />
                       </div>
                       <div className="flex-1 space-y-3 pt-2 max-w-[60ch]">
                         <div className="h-1.5 w-2/3 bg-[oklch(0.18_0_0)] rounded-full animate-breathe opacity-20" />

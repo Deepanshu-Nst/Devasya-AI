@@ -54,7 +54,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="text-muted-foreground text-[13px] font-mono tracking-widest uppercase">
+          <div className="text-muted-foreground text-[11px] font-mono tracking-[0.18em] uppercase">
             synchronizing archive
             <span className="animate-cursor ml-1" style={{ color: 'oklch(0.65 0.20 250)' }}>▍</span>
           </div>
@@ -138,12 +138,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen bg-background relative">
-      {/* Matte noise texture */}
-      <div className="bg-noise" />
+      {/* Cinematic noise texture */}
+      <div className="cinematic-grain" />
 
       {/* ─── Desktop Sidebar ─── */}
       <aside
-        className="hidden md:flex w-56 shrink-0 flex-col sticky top-0 h-screen z-10"
+        className="hidden md:flex w-72 shrink-0 flex-col sticky top-0 h-screen z-10 pr-4"
       >
         <SidebarContent />
       </aside>
@@ -196,8 +196,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
           
           {/* Sparse breadcrumb */}
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] tracking-wide uppercase font-semibold" style={{ color: 'oklch(0.40 0 0)' }}>
+          <div className="flex items-center gap-2 pl-4">
+            <span className="text-[11px] tracking-[0.18em] uppercase font-medium" style={{ color: 'oklch(0.40 0 0)' }}>
               {pageTitle}
             </span>
           </div>
